@@ -1,0 +1,27 @@
+ВЫБОР ПИЛОТНОГО ПОТОКА — контракт 1.0.0
+
+Начните с contracts/reference/handoff.html: правила, карта данных, API и разделение работ.
+contracts/reference/swagger.html открывается локально через mock, без интернета.
+contracts/openapi.yaml и contracts/openapi.json — одна спецификация, 45 операций, 51 схема.
+contracts/schema.sql — PostgreSQL: 13 таблиц, ограничения, индексы, триггеры и view.
+contracts/reference/database-map.svg — обзор связей; точные связи в contracts/schema.sql.
+contracts/control-example.json — данные и результат из контрольного примера ТЗ.
+contracts/acceptance-vectors.json — граничные значения для тестов реализации.
+contracts/reference/validation-report.json — что проверено и какие ограничения остались.
+contracts/reference/source-audit.json — исходники, SHA-256 и проверенные формулы Excel.
+
+Фронт может запустить из корня репозитория: node contracts/reference/mock-server.mjs
+Затем: http://localhost:5080/swagger.html
+Mock только для чтения и UI; не поддерживает запись, расчёт новых данных, PDF.
+При подключении настоящего ASP.NET backend остановите mock (Ctrl+C).
+
+БД: psql -v ON_ERROR_STOP=1 -d pilot_db -f contracts/schema.sql
+Только пустая БД, миграция выполняется один раз.
+
+Стек: ASP.NET Core, C#, PostgreSQL. Приложение пока не создавалось.
+Исходники: локальное ТЗ DOCX, PDF методики, XLSM v2.0.
+Figma просмотрена через браузер: 41 экран, соответствия в contracts/reference/figma-api-map.csv.
+API Figma потребовал OAuth, поэтому использован визуальный просмотр.
+Неопределённые расчётные правила явно описаны в contracts/reference/handoff.html.
+
+Swagger UI 5.18.2: лицензия contracts/reference/LICENSE, уведомления contracts/reference/NOTICE.

@@ -1,12 +1,15 @@
-// Read-only frontend fixture server. No packages required. node mock-server.mjs
+// Read-only frontend fixture server. No packages required.
+// Run from the repository root: node contracts/reference/mock-server.mjs
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const dir=path.dirname(fileURLToPath(import.meta.url));
-const spec=JSON.parse(fs.readFileSync(path.join(dir,'openapi.json'),'utf8'));
-const snap=JSON.parse(fs.readFileSync(path.join(dir,'control-example.json'),'utf8'));
-const staticFiles=new Set(['handoff.html','swagger.html','swagger-ui.css','swagger-ui-bundle.js','openapi.json','openapi.yaml','schema.sql','database-map.svg','control-example.json','validation-report.json','acceptance-vectors.json','source-audit.json','figma-api-map.csv']);
+const contractDir=path.resolve(dir,'..');
+const spec=JSON.parse(fs.readFileSync(path.join(contractDir,'openapi.json'),'utf8'));
+const snap=JSON.parse(fs.readFileSync(path.join(contractDir,'control-example.json'),'utf8'));
+const contractFiles=new Set(['openapi.json','openapi.yaml','schema.sql','control-example.json','acceptance-vectors.json']);
+const referenceFiles=new Set(['handoff.html','swagger.html','swagger-ui.css','swagger-ui-bundle.js','database-map.svg','validation-report.json','source-audit.json','figma-api-map.csv']);
 const server=http.createServer((req,res)=>{
  res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Expose-Headers','ETag');
  res.setHeader('Access-Control-Allow-Headers','Authorization,If-Match,Content-Type');
@@ -18,9 +21,10 @@ const server=http.createServer((req,res)=>{
  if(req.method!=='GET'){fail(501,'MOCK_READ_ONLY','Фикстуры только для чтения. Реальные команды реализует ASP.NET backend.');return;}
  if(!u.pathname.startsWith('/api/v1')){
   const name=u.pathname==='/'?'handoff.html':u.pathname.slice(1);
-  if(!staticFiles.has(name)){fail(404,'NOT_FOUND','Файл не найден');return;}
+  if(!contractFiles.has(name)&&!referenceFiles.has(name)){fail(404,'NOT_FOUND','Файл не найден');return;}
   const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.json':'application/json','.yaml':'text/yaml','.svg':'image/svg+xml','.sql':'text/plain','.csv':'text/csv'}[path.extname(name)];
-  send(200,fs.readFileSync(path.join(dir,name),'utf8'),mime);return;
+  const base=contractFiles.has(name)?contractDir:dir;
+  send(200,fs.readFileSync(path.join(base,name),'utf8'),mime);return;
  }
  const route=u.pathname.slice('/api/v1'.length);
  let matched;
