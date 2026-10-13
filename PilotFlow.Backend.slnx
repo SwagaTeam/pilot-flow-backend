@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PilotFlow.Api/PilotFlow.Api.csproj" />
+    <Project Path="src/PilotFlow.Application/PilotFlow.Application.csproj" />
+    <Project Path="src/PilotFlow.Domain/PilotFlow.Domain.csproj" />
+    <Project Path="src/PilotFlow.Infrastructure/PilotFlow.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PilotFlow.Api.Tests/PilotFlow.Api.Tests.csproj" />
+    <Project Path="tests/PilotFlow.ContractTests/PilotFlow.ContractTests.csproj" />
+  </Folder>
+</Solution>
