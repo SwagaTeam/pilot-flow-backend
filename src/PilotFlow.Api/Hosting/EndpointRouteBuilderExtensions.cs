@@ -1,3 +1,5 @@
+using PilotFlow.Api.Endpoints;
+
 namespace PilotFlow.Api.Hosting;
 
 public static class EndpointRouteBuilderExtensions
@@ -8,6 +10,7 @@ public static class EndpointRouteBuilderExtensions
 
         endpoints.MapGet("/health/live", static () => Results.Ok(new { status = "ok" }));
         endpoints.MapGet("/health/ready", static () => Results.Ok(new { status = "ready" }));
+        endpoints.MapScaffoldProbe();
 
         return endpoints;
     }

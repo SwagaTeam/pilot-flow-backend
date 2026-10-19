@@ -5,6 +5,8 @@ builder.Services.AddPilotFlowApi(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapPilotFlowApi();
 
 app.Run();
