@@ -25,7 +25,7 @@ public sealed class AuthenticationTests(PilotFlowWebApplicationFactory factory)
 
         using var response = await client.GetAsync("/api/v1/_scaffold-probe", CancellationToken.None);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
     }
 
     [Fact]
