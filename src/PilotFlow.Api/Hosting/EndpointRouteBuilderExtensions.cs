@@ -10,7 +10,7 @@ public static class EndpointRouteBuilderExtensions
 
         endpoints.MapGet("/health/live", static () => Results.Ok(new { status = "ok" }));
         endpoints.MapGet("/health/ready", static () => Results.Ok(new { status = "ready" }));
-        endpoints.MapScaffoldProbe();
+        endpoints.MapScaffoldEndpoints();
 
         return endpoints;
     }

@@ -13,7 +13,7 @@ public sealed class AuthenticationTests(PilotFlowWebApplicationFactory factory)
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/api/v1/_scaffold-probe", CancellationToken.None);
+        using var response = await client.GetAsync("/api/v1/me", CancellationToken.None);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -23,7 +23,7 @@ public sealed class AuthenticationTests(PilotFlowWebApplicationFactory factory)
     {
         using var client = CreateAuthenticatedClient();
 
-        using var response = await client.GetAsync("/api/v1/_scaffold-probe", CancellationToken.None);
+        using var response = await client.GetAsync("/api/v1/me", CancellationToken.None);
 
         Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
     }
