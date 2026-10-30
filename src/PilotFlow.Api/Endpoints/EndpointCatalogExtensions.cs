@@ -1,4 +1,5 @@
 using PilotFlow.Api.Authentication;
+using PilotFlow.Api.Concurrency;
 
 namespace PilotFlow.Api.Endpoints;
 
@@ -9,7 +10,7 @@ public static class EndpointCatalogExtensions
         foreach (var descriptor in EndpointCatalog.All)
         {
             var operationId = descriptor.OperationId;
-            endpoints
+            var route = endpoints
                 .MapMethods(
                     descriptor.Pattern,
                     [descriptor.Method],
@@ -17,6 +18,11 @@ public static class EndpointCatalogExtensions
                 .WithName(operationId)
                 .WithMetadata(descriptor)
                 .RequireAuthorization(AuthenticationExtensions.AnalysisUserPolicy);
+
+            if (descriptor.RequiresIfMatch)
+            {
+                route.AddEndpointFilter<IfMatchEndpointFilter>();
+            }
         }
 
         return endpoints;
