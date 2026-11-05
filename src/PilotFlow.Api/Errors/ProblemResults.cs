@@ -4,6 +4,15 @@ namespace PilotFlow.Api.Errors;
 
 public static class ProblemResults
 {
+    public static IResult Unauthorized(HttpContext context) =>
+        Create(
+            context,
+            "urn:pilot:problem:unauthorized",
+            "Не аутентифицирован",
+            StatusCodes.Status401Unauthorized,
+            "Для доступа к операции требуется действительный Bearer-токен с claim sub.",
+            "UNAUTHORIZED");
+
     public static IResult EtagRequired(HttpContext context) =>
         Create(
             context,

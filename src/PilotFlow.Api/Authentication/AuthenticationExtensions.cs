@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using PilotFlow.Api.Errors;
 
 namespace PilotFlow.Api.Authentication;
 
@@ -14,10 +15,9 @@ public static class AuthenticationExtensions
     {
         var jwt = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
-        if (environment.IsProduction()
-            && (string.IsNullOrWhiteSpace(jwt.Authority) || string.IsNullOrWhiteSpace(jwt.Audience)))
+        if (environment.IsProduction())
         {
-            throw new InvalidOperationException("Jwt:Authority and Jwt:Audience are required in Production.");
+            ValidateProductionOptions(jwt);
         }
 
         services
@@ -31,6 +31,16 @@ public static class AuthenticationExtensions
                 {
                     NameClaimType = "name",
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = static async context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.Headers.WWWAuthenticate = JwtBearerDefaults.AuthenticationScheme;
+                        await ProblemResults.Unauthorized(context.HttpContext)
+                            .ExecuteAsync(context.HttpContext);
+                    },
+                };
             });
 
         services
@@ -41,4 +51,18 @@ public static class AuthenticationExtensions
     }
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static void ValidateProductionOptions(JwtOptions jwt)
+    {
+        if (string.IsNullOrWhiteSpace(jwt.Authority) || string.IsNullOrWhiteSpace(jwt.Audience))
+        {
+            throw new InvalidOperationException("Jwt:Authority and Jwt:Audience are required in Production.");
+        }
+
+        if (!Uri.TryCreate(jwt.Authority, UriKind.Absolute, out var authority)
+            || authority.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("Jwt:Authority must be an absolute HTTPS URI in Production.");
+        }
+    }
 }

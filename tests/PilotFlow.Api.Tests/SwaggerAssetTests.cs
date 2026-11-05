@@ -34,6 +34,34 @@ public sealed class SwaggerAssetTests(PilotFlowWebApplicationFactory factory)
         Assert.Equal(expected, actual);
     }
 
+    [Fact]
+    public async Task ServedOpenApiYaml_EqualsRepositoryContract()
+    {
+        using var client = factory.CreateClient();
+        var expected = await File.ReadAllBytesAsync(
+            Path.Combine(FindRepositoryRoot(), "contracts", "openapi.yaml"),
+            CancellationToken.None);
+
+        using var response = await client.GetAsync("/swagger/openapi.yaml", CancellationToken.None);
+        var actual = await response.Content.ReadAsByteArrayAsync(CancellationToken.None);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/yaml", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task SwaggerPage_LoadsServedContractForCurrentOrigin()
+    {
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/swagger/swagger.html", CancellationToken.None);
+
+        Assert.Contains("fetch(\"openapi.json\")", html, StringComparison.Ordinal);
+        Assert.Contains("window.location.origin", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("localhost:5080", html, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("/swagger/swagger-ui.css", "text/css")]
     [InlineData("/swagger/swagger-ui-bundle.js", "text/javascript")]

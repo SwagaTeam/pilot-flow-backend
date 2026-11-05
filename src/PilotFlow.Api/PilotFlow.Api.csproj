@@ -18,7 +18,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="..\..\contracts\reference\swagger.html" Link="wwwroot\swagger\swagger.html">
+    <Content Include="Swagger\swagger.html" Link="wwwroot\swagger\swagger.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

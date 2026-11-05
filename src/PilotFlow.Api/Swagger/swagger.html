@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Swagger — выбор пилотного потока</title>
+  <link rel="stylesheet" href="swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="swagger-ui-bundle.js"></script>
+  <script>
+    fetch("openapi.json")
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`OpenAPI request failed: ${response.status}`);
+        }
+
+        return response.json();
+      })
+      .then(spec => {
+        spec.servers = [{ url: `${window.location.origin}/api/v1`, description: "Current API" }];
+        SwaggerUIBundle({
+          spec,
+          dom_id: "#swagger-ui",
+          validatorUrl: null,
+          deepLinking: true
+        });
+      })
+      .catch(error => {
+        document.getElementById("swagger-ui").textContent = `Не удалось загрузить OpenAPI: ${error.message}`;
+      });
+  </script>
+</body>
+</html>

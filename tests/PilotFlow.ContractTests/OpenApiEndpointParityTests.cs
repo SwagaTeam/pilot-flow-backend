@@ -1,3 +1,7 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Patterns;
 using PilotFlow.ContractTests.OpenApi;
 
 namespace PilotFlow.ContractTests;
@@ -45,6 +49,21 @@ public sealed class OpenApiEndpointParityTests
             .ToArray();
 
         Assert.Empty(duplicates);
+    }
+
+    [Fact]
+    public void Reader_UnnamedBusinessRoute_IsRejected()
+    {
+        var builder = new RouteEndpointBuilder(
+            static _ => Task.CompletedTask,
+            RoutePatternFactory.Parse("/api/v1/me"),
+            order: 0);
+        builder.Metadata.Add(new HttpMethodMetadata([HttpMethods.Get]));
+
+        var exception = Assert.Throws<InvalidDataException>(
+            () => RegisteredEndpointReader.Read([builder.Build()]));
+
+        Assert.Contains("endpoint name", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Key(ApiOperation operation) =>
