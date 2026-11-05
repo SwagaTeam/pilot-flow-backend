@@ -32,6 +32,21 @@ dotnet build PilotFlow.Backend.slnx
 dotnet test PilotFlow.Backend.slnx
 ```
 
+## Docker
+
+Собрать образ и запустить API локально:
+
+```powershell
+docker build -t pilot-flow-backend:local .
+docker compose up --build -d
+Invoke-WebRequest http://127.0.0.1:8080/health/live
+docker compose down
+```
+
+Compose запускает только API на `http://localhost:8080` в окружении Development. PostgreSQL появится на следующем этапе вместе с моделью хранения; добавлять пустой контейнер БД сейчас не имеет смысла.
+
+Workflow `.github/workflows/ci.yml` запускает Release-тесты для push и pull request в `main`. Он намеренно не публикует образы и не выполняет deploy. Для будущей публикации в Docker Hub нужно согласовать имя registry-репозитория и политику тегов, а в GitHub добавить username и access token как secrets. До этого логин и push в CI не добавляются.
+
 ## Контракты и исходные материалы
 
 - `contracts/openapi.yaml` и `contracts/openapi.json` — OpenAPI 1.0.0, 45 операций и 51 схема;

@@ -488,3 +488,61 @@ git add src/PilotFlow.Api tests/PilotFlow.Api.Tests README.md
 git commit -m "docs: publish scaffold runbook and Swagger"
 ```
 
+### Task 9: Docker runtime and test-only CI
+
+**Files:**
+- Create: `Dockerfile`
+- Create: `.dockerignore`
+- Create: `compose.yaml`
+- Create: `.github/workflows/ci.yml`
+- Modify: `README.md`
+
+**Interfaces:**
+- Consumes: completed `PilotFlow.Api`, `PilotFlow.Backend.slnx`, and health endpoints from earlier tasks.
+- Produces: reproducible local API image and container launch; CI workflow that runs tests only and performs no deployment or registry publication.
+
+- [ ] **Step 1: Write container and CI acceptance commands before configuration**
+
+Record the required outcomes: `docker build` succeeds, the container answers `/health/live` with `200`, and the CI workflow executes `dotnet test PilotFlow.Backend.slnx --configuration Release` on pushes and pull requests to `main`.
+
+- [ ] **Step 2: Confirm RED**
+
+Run `docker build -t pilot-flow-backend:local .` and verify it fails because `Dockerfile` does not exist. Verify `.github/workflows/ci.yml` is absent.
+
+- [ ] **Step 3: Implement the minimal multi-stage image**
+
+Use official .NET 10 SDK and ASP.NET runtime images, restore through the solution, publish only `PilotFlow.Api`, run as the image's non-root user, expose port 8080, and set `ASPNETCORE_URLS=http://+:8080`. Do not bake secrets or JWT settings into the image.
+
+- [ ] **Step 4: Add local compose launch**
+
+`compose.yaml` builds the local image, maps `8080:8080`, sets `ASPNETCORE_ENVIRONMENT=Development`, and includes an HTTP healthcheck. It does not add PostgreSQL before the database stage.
+
+- [ ] **Step 5: Add test-only GitHub Actions CI**
+
+Create one workflow triggered by pushes and pull requests to `main`. It checks out the repository, installs .NET 10, restores, and runs `dotnet test PilotFlow.Backend.slnx --configuration Release --no-restore`. Do not log in to Docker Hub, build/push images, deploy, or request registry secrets.
+
+- [ ] **Step 6: Verify GREEN**
+
+Run:
+
+```powershell
+dotnet test PilotFlow.Backend.slnx --configuration Release
+docker build -t pilot-flow-backend:local .
+docker compose up --build -d
+Invoke-WebRequest http://127.0.0.1:8080/health/live
+docker compose down
+```
+
+Expected: tests pass, image builds, container becomes healthy, health endpoint returns `200`, and compose resources stop cleanly.
+
+- [ ] **Step 7: Document future image publication boundary**
+
+Update README with Docker commands and state that Docker Hub publication is intentionally not in CI yet. Note the future requirements: registry repository, Docker Hub username, access token secret, and agreed tag policy.
+
+- [ ] **Step 8: Commit**
+
+```powershell
+git add Dockerfile .dockerignore compose.yaml .github/workflows/ci.yml README.md
+git commit -m "ci: add Docker runtime and test workflow"
+```
+

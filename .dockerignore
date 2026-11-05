@@ -1,0 +1,9 @@
+.git
+.github
+.superpowers
+docs
+outputs
+**/bin
+**/obj
+**/*.user
+**/*.suo
