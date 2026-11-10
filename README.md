@@ -2,7 +2,7 @@
 
 Backend выбора пилотного потока на ASP.NET Core 10. Соседний репозиторий: [frontend](https://github.com/SwagaTeam/pilot-flow-frontend).
 
-Сейчас готов первый исполняемый каркас: слои решения, HTTP-хост, JWT-граница, 45 операций из OpenAPI, строгая форма `If-Match`, health checks и локальный Swagger UI. База данных и бизнес-логика будут добавлены следующими этапами.
+Готовы HTTP-каркас и первая управляемая миграция PostgreSQL. Каркас регистрирует 45 операций из OpenAPI, проверяет JWT и форму `If-Match`, отдаёт Swagger и служебные проверки. Рабочие операции будут реализованы в тонких контроллерах по ресурсам.
 
 ## Быстрый запуск
 
@@ -17,7 +17,7 @@ dotnet run --project src/PilotFlow.Api
 
 - `GET /health/live` — процесс работает;
 - `GET /health/ready` — каркас готов принимать запросы;
-- `/swagger/swagger.html` — автономный Swagger UI без CDN;
+- `/swagger` — автономный Swagger UI без CDN;
 - `/swagger/openapi.json` и `/swagger/openapi.yaml` — авторитетный контракт из `contracts/`.
 
 Health checks и Swagger доступны без аутентификации. Все 45 бизнес-операций требуют Bearer JWT с claim `sub`. Для Production обязательны настройки `Jwt__Authority` и `Jwt__Audience`; секреты в репозитории не хранятся.
@@ -32,25 +32,38 @@ dotnet build PilotFlow.Backend.slnx
 dotnet test PilotFlow.Backend.slnx
 ```
 
+Интеграционные тесты требуют запущенного Docker с Linux-контейнерами. Они поднимают отдельный PostgreSQL с временными данными. HTTP- и контрактные тесты можно запускать по их проектам без Docker.
+
 ## Docker
 
-Собрать образ и запустить API локально:
+Запустите API локально через Docker Compose.
 
 ```powershell
-docker build -t pilot-flow-backend:local .
-docker compose up --build -d
-Invoke-WebRequest http://127.0.0.1:8080/health/live
-docker compose down
+docker compose up --build -d --wait api
 ```
 
-Compose запускает только API на `http://localhost:8080` в окружении Development. PostgreSQL появится на следующем этапе вместе с моделью хранения; добавлять пустой контейнер БД сейчас не имеет смысла.
+Compose запускает API в окружении Development. Swagger доступен на [localhost:8080/swagger](http://localhost:8080/swagger). Для остановки используйте `docker compose down`.
 
-Workflow `.github/workflows/ci.yml` запускает Release-тесты для push и pull request в `main`. Он намеренно не публикует образы и не выполняет deploy. Для будущей публикации в Docker Hub нужно согласовать имя registry-репозитория и политику тегов, а в GitHub добавить username и access token как secrets. До этого логин и push в CI не добавляются.
+Workflow `.github/workflows/ci.yml` запускает Release-тесты для push и pull request в `main`, включая проверки с PostgreSQL. Для будущей публикации в Docker Hub понадобятся имя репозитория, политика тегов и токен с доступом к репозиторию.
+
+### PostgreSQL и миграции
+
+Задайте `PILOTFLOW_DB_PASSWORD` в локальном файле `.env` или в окружении. Затем запустите PostgreSQL 18.7 и примените схему.
+
+```powershell
+docker compose --profile migration run --build --rm migrate
+```
+
+Compose дождётся готовности PostgreSQL и запустит мигратор. Локальная база называется `pilot_flow`, пользователь `pilot_dev_admin` предназначен для разработки. PostgreSQL доступен внутри сети Compose. Данные сохраняются в томе `postgres-data`. Для уже созданного тома используйте пароль, с которым он был инициализирован.
+
+Мигратор запускается отдельно от API. Для внешней БД передайте строку подключения через `PILOTFLOW_MIGRATION_CONNECTION_STRING` и выполните `dotnet run --project src/PilotFlow.DbMigrator`. Миграция V001 предназначена для пустой базы. Для последующих изменений добавляйте следующий SQL-файл (`V002.sql` и далее) в `src/PilotFlow.Infrastructure/Persistence/Migrations/`. Транзакцией управляет мигратор. История хранится в `pilot_migrations.history`. Изменение уже применённого файла приводит к ошибке контрольной суммы.
+
+HTTP-каркас пока работает без подключения к БД. Проверка доступности PostgreSQL, отображения EF Core и транзакционные операции появятся вместе со слоем хранения.
 
 ## Контракты и исходные материалы
 
-- `contracts/openapi.yaml` и `contracts/openapi.json` — OpenAPI 1.0.0, 45 операций и 51 схема;
-- `contracts/schema.sql` — проект схемы PostgreSQL для следующего этапа;
+- `contracts/openapi.yaml` и `contracts/openapi.json` — OpenAPI 3.0.3 для API версии 1.0.0, 45 операций и 51 схема;
+- `contracts/schema.sql` — исходная схема PostgreSQL, на которой основана миграция V001;
 - `contracts/control-example.json` и `contracts/acceptance-vectors.json` — контрольный пример и граничные случаи;
 - `contracts/reference/handoff.html` — правила, архитектура и спорные требования;
 - `contracts/reference/validation-report.json` — результаты проверки контракта;

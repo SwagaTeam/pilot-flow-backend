@@ -15,3 +15,34 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
+
+  postgres:
+    profiles: [database, migration]
+    image: postgres:18.7-alpine
+    environment:
+      POSTGRES_DB: pilot_flow
+      POSTGRES_USER: pilot_dev_admin
+      POSTGRES_PASSWORD: ${PILOTFLOW_DB_PASSWORD:-}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "pilot_dev_admin", "-d", "pilot_flow"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    profiles: [migration]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PILOTFLOW_MIGRATION_CONNECTION_STRING: "Host=postgres;Database=pilot_flow;Username=pilot_dev_admin;GSS Encryption Mode=Disable"
+      PGPASSWORD: ${PILOTFLOW_DB_PASSWORD:-}
+
+volumes:
+  postgres-data:

@@ -1,6 +1,8 @@
 .git
 .github
 .superpowers
+.env
+.env.*
 docs
 outputs
 **/bin
