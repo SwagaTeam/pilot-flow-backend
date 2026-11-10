@@ -21,7 +21,8 @@ These instructions apply to the entire repository.
 
 ## Architecture
 
-- Keep Minimal API endpoints thin: bind and validate transport input, call one application handler, map the result.
+- Implement business HTTP operations in thin ASP.NET Core controllers grouped by resource: bind and validate transport input, call one application handler, map the result.
+- The scaffold's Minimal API catalog can serve unimplemented operations until they move to controllers. Register each business operation once.
 - Endpoint code must not access EF Core, Npgsql, files, clocks, hashes, or PDF libraries directly.
 - `Domain` has no dependency on ASP.NET Core, EF Core, Npgsql, configuration, logging, or system time.
 - `Application` defines use cases and ports. `Infrastructure` implements persistence and external concerns. `Api` references `Infrastructure` only from the composition root.

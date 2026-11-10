@@ -10,6 +10,7 @@ public static class EndpointRouteBuilderExtensions
 
         endpoints.MapGet("/health/live", static () => Results.Ok(new { status = "ok" }));
         endpoints.MapGet("/health/ready", static () => Results.Ok(new { status = "ready" }));
+        endpoints.MapGet("/swagger", static () => Results.LocalRedirect("~/swagger/swagger.html"));
         endpoints.MapScaffoldEndpoints();
 
         return endpoints;

@@ -8,6 +8,20 @@ public sealed class SwaggerAssetTests(PilotFlowWebApplicationFactory factory)
 {
     private readonly PilotFlowWebApplicationFactory factory = factory;
 
+    [Theory]
+    [InlineData("/swagger")]
+    [InlineData("/swagger/")]
+    public async Task SwaggerShortUrl_OpensSwaggerPage(string path)
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(path, CancellationToken.None);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("swagger-ui-bundle.js", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task SwaggerPage_LoadsWithoutAuthentication()
     {
