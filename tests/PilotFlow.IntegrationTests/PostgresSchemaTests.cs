@@ -191,6 +191,7 @@ public sealed class PostgresSchemaFixture : IAsyncLifetime
         .Build();
 
     public NpgsqlDataSource DataSource { get; private set; } = null!;
+    public string ConnectionString => postgres.GetConnectionString();
 
     public async Task InitializeAsync()
     {

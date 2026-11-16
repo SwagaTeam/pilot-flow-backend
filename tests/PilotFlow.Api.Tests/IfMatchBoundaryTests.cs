@@ -42,7 +42,7 @@ public sealed class IfMatchBoundaryTests(PilotFlowWebApplicationFactory factory)
         using var response = await SendMutationAsync(ifMatch: null);
 
         Assert.Equal((HttpStatusCode)428, response.StatusCode);
-        Assert.Equal("ETAG_REQUIRED", await ReadCodeAsync(response));
+        Assert.Equal("IF_MATCH_REQUIRED", await ReadCodeAsync(response));
     }
 
     [Fact]
@@ -51,15 +51,16 @@ public sealed class IfMatchBoundaryTests(PilotFlowWebApplicationFactory factory)
         using var response = await SendMutationAsync("not-an-etag");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("INVALID_ETAG", await ReadCodeAsync(response));
+        Assert.Equal("INVALID_REQUEST", await ReadCodeAsync(response));
     }
 
     [Fact]
-    public async Task VersionMutation_WithValidIfMatch_ReachesStub()
+    public async Task VersionMutation_WithValidIfMatchAndMissingBody_ReturnsInvalidRequest()
     {
         using var response = await SendMutationAsync(ValidEtag);
 
-        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("INVALID_REQUEST", await ReadCodeAsync(response));
     }
 
     [Fact]
@@ -75,14 +76,17 @@ public sealed class IfMatchBoundaryTests(PilotFlowWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> SendMutationAsync(string? ifMatch)
     {
-        var client = factory.CreateClient();
+        using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthenticationHandler.SubjectHeader, "test-subject");
         if (ifMatch is not null)
         {
             client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", ifMatch);
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Put, MutationPath);
+        using var request = new HttpRequestMessage(HttpMethod.Put, MutationPath)
+        {
+            Content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json"),
+        };
         return await client.SendAsync(request, CancellationToken.None);
     }
 

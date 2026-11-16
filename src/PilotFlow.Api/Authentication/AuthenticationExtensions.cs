@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using PilotFlow.Api.Errors;
@@ -33,6 +34,15 @@ public static class AuthenticationExtensions
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnTokenValidated = static context =>
+                    {
+                        if (!HasSubject(context.Principal))
+                        {
+                            context.Fail("A valid subject claim is required.");
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = static async context =>
                     {
                         context.HandleResponse();
@@ -45,12 +55,17 @@ public static class AuthenticationExtensions
 
         services
             .AddAuthorizationBuilder()
-            .AddPolicy(AnalysisUserPolicy, policy => policy.RequireAuthenticatedUser().RequireClaim("sub"));
+            .AddPolicy(AnalysisUserPolicy, policy => policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasSubject(context.User)));
 
         return services;
     }
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static bool HasSubject(ClaimsPrincipal? principal) =>
+        principal?.FindFirst("sub")?.Value is { Length: <= 300 } subject
+        && !string.IsNullOrWhiteSpace(subject) && !subject.Contains('\0', StringComparison.Ordinal);
 
     private static void ValidateProductionOptions(JwtOptions jwt)
     {

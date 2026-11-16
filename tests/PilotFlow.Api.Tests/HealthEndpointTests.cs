@@ -17,11 +17,11 @@ public sealed class HealthEndpointTests(PilotFlowWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task ReadyHealth_ReturnsOkBeforeDatabaseStage()
+    public async Task ReadyHealth_WithoutDatabase_ReturnsServiceUnavailable()
     {
         using var response = await client.GetAsync("/health/ready", CancellationToken.None);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 
     [Fact]

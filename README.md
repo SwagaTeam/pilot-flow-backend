@@ -2,7 +2,7 @@
 
 Backend выбора пилотного потока на ASP.NET Core 10. Соседний репозиторий: [frontend](https://github.com/SwagaTeam/pilot-flow-frontend).
 
-Готовы HTTP-каркас и первая управляемая миграция PostgreSQL. Каркас регистрирует 45 операций из OpenAPI, проверяет JWT и форму `If-Match`, отдаёт Swagger и служебные проверки. Рабочие операции будут реализованы в тонких контроллерах по ресурсам.
+Реализованы шесть операций в `AnalysesController`: создание анализа с первым черновиком, список и чтение анализов, список и чтение версий, замена данных черновика. PostgreSQL хранит данные, EF Core выполняет чтение и создание. Остальные операции OpenAPI пока возвращают `501 NOT_IMPLEMENTED` после обязательных проверок.
 
 ## Быстрый запуск
 
@@ -16,13 +16,13 @@ dotnet run --project src/PilotFlow.Api
 Профиль по умолчанию поднимает API на `http://localhost:5037`:
 
 - `GET /health/live` — процесс работает;
-- `GET /health/ready` — каркас готов принимать запросы;
+- `GET /health/ready` — база доступна, миграция применена и у API есть доступ к таблице анализов. Без доступной БД возвращается `503`;
 - `/swagger` — автономный Swagger UI без CDN;
 - `/swagger/openapi.json` и `/swagger/openapi.yaml` — авторитетный контракт из `contracts/`.
 
-Health checks и Swagger доступны без аутентификации. Все 45 бизнес-операций требуют Bearer JWT с claim `sub`. Для Production обязательны настройки `Jwt__Authority` и `Jwt__Audience`; секреты в репозитории не хранятся.
+Health checks и Swagger доступны без аутентификации. Бизнес-операции требуют Bearer JWT с claim `sub`. Задайте `Jwt__Authority`, `Jwt__Audience` и `ConnectionStrings__PilotFlow` в окружении при запуске через `dotnet run`. В Production эти настройки обязательны при старте.
 
-На этом этапе бизнес-операции намеренно не реализованы: после успешной аутентификации они отвечают `501 application/problem+json` с кодом `NOT_IMPLEMENTED`. Мутации агрегата сначала проверяют один сильный `If-Match` формата `"v:{versionId}:r:{revision}"` и возвращают `428 ETAG_REQUIRED` либо `400 INVALID_ETAG`, если заголовок отсутствует или некорректен.
+Возьмите тело `POST /api/v1/analyses` из примера Swagger. После создания используйте `Location` для чтения анализа и значения `id` и `version.id` для обращения к версии. Для `PUT` передайте объект `data` целиком и последний `ETag` в заголовке `If-Match`. Отсутствующий заголовок даёт `428 IF_MATCH_REQUIRED`, некорректный — `400 INVALID_REQUEST`, устаревший — `412 REVISION_CONFLICT`. Чужой анализ даёт `404 NOT_FOUND`. Списки принимают `offset`, `limit` и поиск `q` по названию.
 
 ## Проверки
 
@@ -36,7 +36,7 @@ dotnet test PilotFlow.Backend.slnx
 
 ## Docker
 
-Запустите API локально через Docker Compose.
+Для просмотра Swagger можно запустить один API-контейнер.
 
 ```powershell
 docker compose up --build -d --wait api
@@ -48,17 +48,24 @@ Workflow `.github/workflows/ci.yml` запускает Release-тесты для
 
 ### PostgreSQL и миграции
 
-Задайте `PILOTFLOW_DB_PASSWORD` в локальном файле `.env` или в окружении. Затем запустите PostgreSQL 18.7 и примените схему.
+Для работы с данными задайте параметры в локальном `.env` или в окружении.
+
+- `PILOTFLOW_DB_PASSWORD` — пароль локального администратора PostgreSQL.
+- `PILOTFLOW_APP_DB_PASSWORD` — отдельный пароль роли `pilot_app`, от которой работает API.
+- `PILOTFLOW_API_CONNECTION_STRING` — параметры Npgsql без пароля. Для Compose укажите `Host=postgres`, `Database=pilot_flow`, `Username=pilot_app` и `GSS Encryption Mode=Disable`, разделив их точкой с запятой.
+- `PILOTFLOW_JWT_AUTHORITY` и `PILOTFLOW_JWT_AUDIENCE` — настройки поставщика Bearer-токенов для запросов из Swagger.
 
 ```powershell
-docker compose --profile migration run --build --rm migrate
+docker compose --profile migration run --build --rm grant-api
+docker compose up --build -d --wait api
+Invoke-WebRequest http://localhost:8080/health/ready
 ```
 
-Compose дождётся готовности PostgreSQL и запустит мигратор. Локальная база называется `pilot_flow`, пользователь `pilot_dev_admin` предназначен для разработки. PostgreSQL доступен внутри сети Compose. Данные сохраняются в томе `postgres-data`. Для уже созданного тома используйте пароль, с которым он был инициализирован.
+Compose дождётся готовности PostgreSQL и завершения миграций. Затем `grant-api` создаёт локальную роль `pilot_app` и выдаёт права для операций с анализами. Данные сохраняются в томе `postgres-data`. Для существующего тома используйте пароль, с которым он был инициализирован.
 
 Мигратор запускается отдельно от API. Для внешней БД передайте строку подключения через `PILOTFLOW_MIGRATION_CONNECTION_STRING` и выполните `dotnet run --project src/PilotFlow.DbMigrator`. Миграция V001 предназначена для пустой базы. Для последующих изменений добавляйте следующий SQL-файл (`V002.sql` и далее) в `src/PilotFlow.Infrastructure/Persistence/Migrations/`. Транзакцией управляет мигратор. История хранится в `pilot_migrations.history`. Изменение уже применённого файла приводит к ошибке контрольной суммы.
 
-HTTP-каркас пока работает без подключения к БД. Проверка доступности PostgreSQL, отображения EF Core и транзакционные операции появятся вместе со слоем хранения.
+Для внешней БД администратор создаёт отдельную роль `pilot_app` и после миграций применяет `src/PilotFlow.Infrastructure/Persistence/Security/analysis-grants.sql`. Подключайте API под этой ролью. Роль мигратора нужна только для изменения схемы.
 
 ## Контракты и исходные материалы
 

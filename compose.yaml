@@ -7,6 +7,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PilotFlow: ${PILOTFLOW_API_CONNECTION_STRING:-}
+      PGPASSWORD: ${PILOTFLOW_APP_DB_PASSWORD:-}
+      Jwt__Authority: ${PILOTFLOW_JWT_AUTHORITY:-}
+      Jwt__Audience: ${PILOTFLOW_JWT_AUDIENCE:-}
     ports:
       - "8080:8080"
     healthcheck:
@@ -43,6 +47,28 @@ services:
     environment:
       PILOTFLOW_MIGRATION_CONNECTION_STRING: "Host=postgres;Database=pilot_flow;Username=pilot_dev_admin;GSS Encryption Mode=Disable"
       PGPASSWORD: ${PILOTFLOW_DB_PASSWORD:-}
+
+  grant-api:
+    profiles: [migration]
+    image: postgres:18.7-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGPASSWORD: ${PILOTFLOW_DB_PASSWORD:-}
+      PILOTFLOW_APP_DB_PASSWORD: ${PILOTFLOW_APP_DB_PASSWORD:-}
+    volumes:
+      - ./docker/postgres/provision-app.sql:/bootstrap/provision-app.sql:ro
+      - ./src/PilotFlow.Infrastructure/Persistence/Security/analysis-grants.sql:/bootstrap/analysis-grants.sql:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${PILOTFLOW_APP_DB_PASSWORD:?Set PILOTFLOW_APP_DB_PASSWORD}"
+        exec psql -X -h postgres -U pilot_dev_admin -d pilot_flow -v ON_ERROR_STOP=1 \
+          -f /bootstrap/provision-app.sql -f /bootstrap/analysis-grants.sql
 
 volumes:
   postgres-data:

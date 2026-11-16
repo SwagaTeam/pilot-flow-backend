@@ -4,11 +4,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <ProjectReference Include="..\..\src\PilotFlow.Infrastructure\PilotFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\PilotFlow.Api\PilotFlow.Api.csproj" />
+    <Compile Include="..\PilotFlow.Api.Tests\Infrastructure\TestAuthenticationHandler.cs" Link="TestAuthenticationHandler.cs" />
+    <None Include="..\..\src\PilotFlow.Infrastructure\Persistence\Security\analysis-grants.sql"
+          Link="analysis-grants.sql" CopyToOutputDirectory="PreserveNewest" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

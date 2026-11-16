@@ -7,6 +7,8 @@ builder.Services.AddPilotFlowApi(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
+app.UseExceptionHandler(errorApp => errorApp.Run(ApiExceptionHandler.WriteAsync));
+
 var staticRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
 var staticContentTypes = new FileExtensionContentTypeProvider();
 staticContentTypes.Mappings[".yaml"] = "application/yaml";

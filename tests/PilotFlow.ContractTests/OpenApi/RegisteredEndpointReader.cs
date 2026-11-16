@@ -29,7 +29,8 @@ public static class RegisteredEndpointReader
 
     private static IEnumerable<ApiOperation> ToOperations(RouteEndpoint endpoint)
     {
-        var pattern = endpoint.RoutePattern.RawText;
+        var rawPattern = endpoint.RoutePattern.RawText;
+        var pattern = rawPattern is null ? null : "/" + rawPattern.TrimStart('/');
         if (pattern is null
             || (!pattern.Equals("/api/v1", StringComparison.Ordinal)
                 && !pattern.StartsWith("/api/v1/", StringComparison.Ordinal)))

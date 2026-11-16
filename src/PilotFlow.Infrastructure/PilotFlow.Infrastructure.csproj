@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <EmbeddedResource Include="Persistence/Migrations/*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
     <ProjectReference Include="..\PilotFlow.Application\PilotFlow.Application.csproj" />
     <ProjectReference Include="..\PilotFlow.Domain\PilotFlow.Domain.csproj" />

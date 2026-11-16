@@ -33,9 +33,12 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
                 $"{operation.Method} {operation.Path} returned {(int)malformed.StatusCode} for malformed If-Match.");
 
             using var valid = await SendAsync(client, operation, ValidEtag);
+            var expected = operation.OperationId == "replaceVersionData"
+                ? HttpStatusCode.BadRequest
+                : HttpStatusCode.NotImplemented;
             Assert.True(
-                valid.StatusCode == HttpStatusCode.NotImplemented,
-                $"{operation.Method} {operation.Path} returned {(int)valid.StatusCode} for valid If-Match.");
+                valid.StatusCode == expected,
+                $"{operation.Method} {operation.Path} returned {(int)valid.StatusCode} instead of {(int)expected}.");
         }
     }
 
@@ -45,7 +48,10 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
         string? ifMatch)
     {
         var path = RouteParameterRegex().Replace(operation.Path, "00000000-0000-4000-8000-000000000001");
-        using var request = new HttpRequestMessage(new HttpMethod(operation.Method), path);
+        using var request = new HttpRequestMessage(new HttpMethod(operation.Method), path)
+        {
+            Content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json"),
+        };
         if (ifMatch is not null)
         {
             request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
@@ -72,7 +78,8 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
 
                 operations.Add(new RequiredOperation(
                     candidate.Name.ToUpperInvariant(),
-                    "/api/v1" + route.Name));
+                    "/api/v1" + route.Name,
+                    candidate.Value.GetProperty("operationId").GetString()!));
             }
         }
 
@@ -100,7 +107,7 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
             ?? throw new DirectoryNotFoundException("PilotFlow.Backend.slnx was not found above the test output directory.");
     }
 
-    private sealed record RequiredOperation(string Method, string Path);
+    private sealed record RequiredOperation(string Method, string Path, string OperationId);
 
     [GeneratedRegex("\\{[^}]+\\}", RegexOptions.CultureInvariant)]
     private static partial Regex RouteParameterRegex();

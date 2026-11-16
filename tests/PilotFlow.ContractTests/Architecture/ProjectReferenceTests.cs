@@ -30,7 +30,7 @@ public sealed class ProjectReferenceTests
             ["tests/PilotFlow.Api.Tests/PilotFlow.Api.Tests.csproj"] =
                 ["src/PilotFlow.Api/PilotFlow.Api.csproj"],
             ["tests/PilotFlow.IntegrationTests/PilotFlow.IntegrationTests.csproj"] =
-                ["src/PilotFlow.Infrastructure/PilotFlow.Infrastructure.csproj"],
+                ["src/PilotFlow.Api/PilotFlow.Api.csproj", "src/PilotFlow.Infrastructure/PilotFlow.Infrastructure.csproj"],
         };
 
         foreach (var (projectPath, expectedReferences) in expected)
