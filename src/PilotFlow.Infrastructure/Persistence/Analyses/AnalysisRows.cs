@@ -1,6 +1,5 @@
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using PilotFlow.Application.Analyses;
+using PilotFlow.Application.Rules;
 using PilotFlow.Domain.Analyses;
 
 namespace PilotFlow.Infrastructure.Persistence.Analyses;
@@ -17,15 +16,6 @@ internal sealed class AnalysisRow
 
 internal sealed class AnalysisVersionRow
 {
-    private const string InitialRules = "fck-2026-tz-v1";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver
-        {
-            Modifiers = { AllowLegacyEvidence },
-        },
-    };
-
     public Guid Id { get; init; }
     public Guid AnalysisId { get; init; }
     public int VersionNumber { get; init; }
@@ -66,7 +56,7 @@ internal sealed class AnalysisVersionRow
         VersionNumber = 1,
         Revision = 1,
         State = "draft",
-        RulesVersion = InitialRules,
+        RulesVersion = InitialRuleSetPolicies.Version,
         Title = data.Title,
         EnterpriseName = data.EnterpriseName,
         Region = data.Region,
@@ -83,11 +73,11 @@ internal sealed class AnalysisVersionRow
         TotalRevenue = data.TotalRevenue,
         Currency = data.Currency,
         AccountingBasis = data.AccountingBasis,
-        RevenueEvidence = WriteJson(data.RevenueEvidence),
+        RevenueEvidence = StoredJson.Write(data.RevenueEvidence),
         RemainderExplanation = data.RemainderExplanation,
         NomenclatureComplete = data.NomenclatureComplete,
-        CompletenessEvidence = WriteJson(data.CompletenessEvidence),
-        Participants = WriteJson(data.Participants),
+        CompletenessEvidence = StoredJson.Write(data.CompletenessEvidence),
+        Participants = StoredJson.Write(data.Participants),
         EnterpriseInn = data.EnterpriseInn,
         FamilyConclusions = data.FamilyConclusions,
         RankingConclusions = data.RankingConclusions,
@@ -105,11 +95,11 @@ internal sealed class AnalysisVersionRow
             TotalRevenue = TotalRevenue,
             Currency = Currency,
             AccountingBasis = AccountingBasis,
-            RevenueEvidence = ReadJson<AnalysisEvidence>(RevenueEvidence),
+            RevenueEvidence = StoredJson.Read<AnalysisEvidence>(RevenueEvidence),
             RemainderExplanation = RemainderExplanation,
             NomenclatureComplete = NomenclatureComplete,
-            CompletenessEvidence = ReadJson<AnalysisEvidence>(CompletenessEvidence),
-            Participants = ReadJson<AnalysisParticipant[]>(Participants),
+            CompletenessEvidence = StoredJson.Read<AnalysisEvidence>(CompletenessEvidence),
+            Participants = StoredJson.Read<AnalysisParticipant[]>(Participants),
             EnterpriseInn = EnterpriseInn,
             FamilyConclusions = FamilyConclusions,
             RankingConclusions = RankingConclusions,
@@ -118,24 +108,6 @@ internal sealed class AnalysisVersionRow
             ActivitiesPeriod = ReadPeriod(ActivitiesStart, ActivitiesEnd),
             ForecastPeriod = ReadPeriod(ForecastStart, ForecastEnd),
         });
-
-    internal static string WriteJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
-
-    private static T ReadJson<T>(string value) =>
-        JsonSerializer.Deserialize<T>(value, JsonOptions)
-        ?? throw new InvalidDataException("Invalid null analysis metadata in PostgreSQL.");
-
-    private static void AllowLegacyEvidence(JsonTypeInfo type)
-    {
-        // Older rows can omit nullable evidence fields. Require them on HTTP input only.
-        if (type.Type == typeof(AnalysisEvidence))
-        {
-            foreach (var field in type.Properties)
-            {
-                field.IsRequired = false;
-            }
-        }
-    }
 
     private static AnalysisPeriod? ReadPeriod(DateOnly? start, DateOnly? end) =>
         start.HasValue && end.HasValue ? new AnalysisPeriod { Start = start.Value, End = end.Value } : null;

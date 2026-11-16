@@ -28,6 +28,7 @@ public enum AnalysisWriteStatus
     Fixed,
     RevisionConflict,
     ValidationFailed,
+    StateConflict,
 }
 
 public sealed record AnalysisWriteResult<T>(AnalysisWriteStatus Status, T? Value = default, IReadOnlyList<AnalysisIssue>? Issues = null);

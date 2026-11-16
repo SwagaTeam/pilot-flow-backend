@@ -43,6 +43,10 @@ public static class ProblemResults
         Create(context, "urn:pilot:problem:state-conflict", "Версия зафиксирована", StatusCodes.Status409Conflict,
             "Изменять можно только черновик.", "STATE_CONFLICT");
 
+    public static ApiProblemResult LinkedResourceConflict(HttpContext context) =>
+        Create(context, "urn:pilot:problem:state-conflict", "Конфликт связей", StatusCodes.Status409Conflict,
+            "Проверьте существующие связи и идентификаторы перед повтором операции.", "STATE_CONFLICT");
+
     public static ApiProblemResult RevisionConflict(HttpContext context) =>
         Create(context, "urn:pilot:problem:revision-conflict", "Ревизия изменилась", StatusCodes.Status412PreconditionFailed,
             "Загрузите актуальные данные и повторите изменение с актуальным ETag.", "REVISION_CONFLICT");

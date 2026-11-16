@@ -6,9 +6,7 @@ public static class EndpointCatalog
 {
     public static IReadOnlyList<EndpointDescriptor> All { get; } =
     [
-        .. IdentityRulesCatalog.Endpoints,
         .. AnalysisVersionCatalog.Endpoints,
-        .. ProductOperationCatalog.Endpoints,
         .. FamilyRouteCatalog.Endpoints,
         .. EvaluationCatalog.Endpoints,
         .. ProtocolSelectionCatalog.Endpoints,

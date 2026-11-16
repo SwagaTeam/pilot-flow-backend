@@ -16,7 +16,10 @@ internal sealed class PostgresReadinessCheck(IServiceProvider services) : IHealt
 
         try
         {
-            await using var command = dataSource.CreateCommand("SELECT 1 FROM pilot.analysis LIMIT 0");
+            await using var command = dataSource.CreateCommand("""
+                SELECT 1 FROM pilot.analysis LIMIT 0;
+                SELECT 1 FROM pilot.product_completeness LIMIT 0;
+                """);
             await command.ExecuteNonQueryAsync(cancellationToken);
             return HealthCheckResult.Healthy();
         }

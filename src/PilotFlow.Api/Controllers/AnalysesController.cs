@@ -31,7 +31,7 @@ public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands co
     }
 
     [HttpGet(Name = "listAnalyses")]
-    public async Task<IResult> ListAsync([FromQuery] AnalysisPageQuery query, CancellationToken cancellationToken)
+    public async Task<IResult> ListAsync([FromQuery] PageQuery query, CancellationToken cancellationToken)
     {
         var page = await store.ListAsync(Owner, query.ToPage(), cancellationToken);
         return Results.Ok(page);
@@ -52,7 +52,7 @@ public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands co
 
     [HttpGet("{analysisId}/versions", Name = "listVersions")]
     public async Task<IResult> ListVersionsAsync(
-        Guid analysisId, [FromQuery] AnalysisPageQuery query, CancellationToken cancellationToken)
+        Guid analysisId, [FromQuery] PageQuery query, CancellationToken cancellationToken)
     {
         var page = await store.ListVersionsAsync(Owner, analysisId, query.ToPage(), cancellationToken);
         return page is null ? ProblemResults.NotFound(HttpContext) : Results.Ok(page);
@@ -107,7 +107,7 @@ public sealed class CreateAnalysisRequest
     public required AnalysisData Data { get; init; }
 }
 
-public sealed class AnalysisPageQuery
+public class PageQuery
 {
     [Range(0, int.MaxValue)]
     public int Offset { get; init; }

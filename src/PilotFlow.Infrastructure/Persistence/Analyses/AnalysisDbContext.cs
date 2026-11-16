@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PilotFlow.Infrastructure.Persistence.Catalogs;
 
 namespace PilotFlow.Infrastructure.Persistence.Analyses;
 
@@ -52,5 +53,6 @@ internal sealed class AnalysisDbContext(DbContextOptions<AnalysisDbContext> opti
         version.Property(row => row.EnterpriseInn).HasColumnName("enterprise_inn");
         version.Property(row => row.FamilyConclusions).HasColumnName("family_conclusions");
         version.Property(row => row.RankingConclusions).HasColumnName("ranking_conclusions");
+        CatalogMapping.Configure(modelBuilder);
     }
 }

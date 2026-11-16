@@ -33,9 +33,13 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
                 $"{operation.Method} {operation.Path} returned {(int)malformed.StatusCode} for malformed If-Match.");
 
             using var valid = await SendAsync(client, operation, ValidEtag);
-            var expected = operation.OperationId == "replaceVersionData"
-                ? HttpStatusCode.BadRequest
-                : HttpStatusCode.NotImplemented;
+            var expected = operation.OperationId switch
+            {
+                "replaceVersionData" or "createProduct" or "replaceProduct" or "replaceProductRoute"
+                    or "createOperation" or "replaceOperation" => HttpStatusCode.BadRequest,
+                "deleteProduct" or "deleteOperation" => HttpStatusCode.ServiceUnavailable,
+                _ => HttpStatusCode.NotImplemented,
+            };
             Assert.True(
                 valid.StatusCode == expected,
                 $"{operation.Method} {operation.Path} returned {(int)valid.StatusCode} instead of {(int)expected}.");

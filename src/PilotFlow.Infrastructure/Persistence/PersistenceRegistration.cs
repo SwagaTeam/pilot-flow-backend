@@ -2,7 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using PilotFlow.Application.Analyses;
+using PilotFlow.Application.Catalogs;
+using PilotFlow.Application.Rules;
 using PilotFlow.Infrastructure.Persistence.Analyses;
+using PilotFlow.Infrastructure.Persistence.Catalogs;
+using PilotFlow.Infrastructure.Persistence.Rules;
 
 namespace PilotFlow.Infrastructure.Persistence;
 
@@ -33,6 +37,9 @@ public static class PersistenceRegistration
                 options.UseNpgsql((string?)null);
             }
         });
-        return services.AddScoped<IAnalysisStore, PostgresAnalysisStore>();
+        return services.AddScoped<IAnalysisStore, PostgresAnalysisStore>()
+            .AddScoped<IRuleSetStore, PostgresRuleSetStore>()
+            .AddScoped<VersionCatalogTransactions>()
+            .AddScoped<IVersionCatalog, PostgresVersionCatalog>();
     }
 }

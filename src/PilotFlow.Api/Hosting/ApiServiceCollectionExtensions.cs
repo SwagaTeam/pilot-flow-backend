@@ -3,6 +3,7 @@ using PilotFlow.Api.Authentication;
 using PilotFlow.Api.Controllers;
 using PilotFlow.Api.Errors;
 using PilotFlow.Application.Analyses;
+using PilotFlow.Application.Catalogs;
 using PilotFlow.Infrastructure.Persistence;
 
 namespace PilotFlow.Api.Hosting;
@@ -27,6 +28,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddAnalysisPersistence(connectionString);
         services.AddScoped<AnalysisCommands>();
+        services.AddScoped<CatalogCommands>();
         services.AddHealthChecks().AddCheck<PostgresReadinessCheck>("postgres", timeout: TimeSpan.FromSeconds(5));
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new DecimalStringConverter()));
         services.AddControllers(options => options.Filters.Add<JsonInputProblemFilter>())

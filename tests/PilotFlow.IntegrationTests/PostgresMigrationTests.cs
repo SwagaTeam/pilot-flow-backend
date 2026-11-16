@@ -24,7 +24,7 @@ public sealed class PostgresMigrationTests : IAsyncLifetime
             PostgresMigrator.ApplyAsync(dataSource, CancellationToken.None));
 
         Assert.Equal(13L, await ScalarAsync(dataSource, "SELECT count(*) FROM pg_tables WHERE schemaname = 'pilot'"));
-        Assert.Equal(1L, await ScalarAsync(dataSource, "SELECT count(*) FROM pilot_migrations.history"));
+        Assert.Equal(2L, await ScalarAsync(dataSource, "SELECT count(*) FROM pilot_migrations.history"));
         Assert.Equal(1L, await ScalarAsync(
             dataSource,
             "SELECT count(*) FROM pilot_migrations.history WHERE version = 1 AND length(sha256) = 64 AND applied_at IS NOT NULL"));

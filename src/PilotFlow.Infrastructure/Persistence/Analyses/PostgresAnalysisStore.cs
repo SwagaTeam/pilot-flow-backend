@@ -9,7 +9,7 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
 {
     public async Task<AnalysisDetails> CreateAsync(string owner, AnalysisData data, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        db.EnsureConfigured();
         var analysis = new AnalysisRow { Id = Guid.NewGuid(), OwnerSubject = owner };
         var version = AnalysisVersionRow.Create(analysis.Id, data);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -22,12 +22,12 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
 
     public async Task<Page<AnalysisDetails>> ListAsync(string owner, PageRequest page, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        db.EnsureConfigured();
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         var owned = LatestVersions(owner);
         var unfilteredTotal = await owned.CountAsync(cancellationToken);
         var filtered = page.Query is { Length: > 0 } query
-            ? owned.Where(item => EF.Functions.ILike(item.Version.Title, ContainsPattern(query), "\\"))
+            ? owned.Where(item => EF.Functions.ILike(item.Version.Title, VersionPersistence.ContainsPattern(query), "\\"))
             : owned;
         var total = page.Query is { Length: > 0 } ? await filtered.CountAsync(cancellationToken) : unfilteredTotal;
         var items = await filtered.OrderBy(item => item.Analysis.CreatedAt).ThenBy(item => item.Analysis.Id)
@@ -39,7 +39,7 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
 
     public async Task<AnalysisDetails?> GetAsync(string owner, Guid analysisId, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        db.EnsureConfigured();
         var match = await LatestVersions(owner)
             .SingleOrDefaultAsync(item => item.Analysis.Id == analysisId, cancellationToken);
         return match?.Analysis.ToDetails(match.Version);
@@ -48,7 +48,7 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
     public async Task<Page<AnalysisVersionDetails>?> ListVersionsAsync(
         string owner, Guid analysisId, PageRequest page, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        db.EnsureConfigured();
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         if (!await db.Analyses.AsNoTracking().AnyAsync(
             item => item.Id == analysisId && item.OwnerSubject == owner, cancellationToken))
@@ -56,10 +56,10 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
             return null;
         }
 
-        var owned = OwnedVersions(owner, analysisId);
+        var owned = db.OwnedVersions(owner, analysisId);
         var unfilteredTotal = await owned.CountAsync(cancellationToken);
         var filtered = page.Query is { Length: > 0 } query
-            ? owned.Where(version => EF.Functions.ILike(version.Title, ContainsPattern(query), "\\"))
+            ? owned.Where(version => EF.Functions.ILike(version.Title, VersionPersistence.ContainsPattern(query), "\\"))
             : owned;
         var total = page.Query is { Length: > 0 } ? await filtered.CountAsync(cancellationToken) : unfilteredTotal;
         var items = await filtered.OrderBy(version => version.VersionNumber)
@@ -72,8 +72,8 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
     public async Task<AnalysisVersionDetails?> GetVersionAsync(
         string owner, Guid analysisId, Guid versionId, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
-        var version = await OwnedVersions(owner, analysisId).SingleOrDefaultAsync(
+        db.EnsureConfigured();
+        var version = await db.OwnedVersions(owner, analysisId).SingleOrDefaultAsync(
             item => item.Id == versionId, cancellationToken);
         return version?.ToDetails();
     }
@@ -81,12 +81,12 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
     public async Task<AnalysisWriteResult<AnalysisVersionDetails>> ReplaceVersionAsync(
         string owner, VersionUpdate target, AnalysisData data, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        db.EnsureConfigured();
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
-        var revenueEvidence = AnalysisVersionRow.WriteJson(data.RevenueEvidence);
-        var completenessEvidence = AnalysisVersionRow.WriteJson(data.CompletenessEvidence);
-        var participants = AnalysisVersionRow.WriteJson(data.Participants);
+        var revenueEvidence = StoredJson.Write(data.RevenueEvidence);
+        var completenessEvidence = StoredJson.Write(data.CompletenessEvidence);
+        var participants = StoredJson.Write(data.Participants);
         var changed = await db.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE pilot.analysis_version AS version
             SET
@@ -127,7 +127,7 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
 
         if (changed == 0)
         {
-            var state = await OwnedVersions(owner, target.AnalysisId).Where(version => version.Id == target.VersionId)
+            var state = await db.OwnedVersions(owner, target.AnalysisId).Where(version => version.Id == target.VersionId)
                 .Select(version => version.State).SingleOrDefaultAsync(cancellationToken);
             return new(state switch
             {
@@ -139,17 +139,11 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
 
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM pilot.selection WHERE version_id = {target.VersionId}", cancellationToken);
-        var stored = await OwnedVersions(owner, target.AnalysisId)
+        var stored = await db.OwnedVersions(owner, target.AnalysisId)
             .SingleAsync(version => version.Id == target.VersionId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new(AnalysisWriteStatus.Success, stored.ToDetails());
     }
-
-    private IQueryable<AnalysisVersionRow> OwnedVersions(string owner, Guid analysisId) =>
-        from version in db.Versions.AsNoTracking()
-        join analysis in db.Analyses.AsNoTracking() on version.AnalysisId equals analysis.Id
-        where analysis.Id == analysisId && analysis.OwnerSubject == owner
-        select version;
 
     private IQueryable<LatestVersion> LatestVersions(string owner) =>
         from analysis in db.Analyses.AsNoTracking()
@@ -157,19 +151,6 @@ internal sealed class PostgresAnalysisStore(AnalysisDbContext db) : IAnalysisSto
         where analysis.OwnerSubject == owner
             && !db.Versions.Any(other => other.AnalysisId == analysis.Id && other.VersionNumber > version.VersionNumber)
         select new LatestVersion { Analysis = analysis, Version = version };
-
-    private void EnsureConfigured()
-    {
-        if (string.IsNullOrWhiteSpace(db.Database.GetConnectionString()))
-        {
-            throw new AnalysisStoreUnavailableException();
-        }
-    }
-
-    private static string ContainsPattern(string query) => "%"
-        + query.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("%", "\\%", StringComparison.Ordinal)
-            .Replace("_", "\\_", StringComparison.Ordinal) + "%";
 
     private sealed class LatestVersion
     {
