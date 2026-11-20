@@ -13,11 +13,13 @@ internal static class FamilyMatrixCalculator
         var products = input.Products.Select(product =>
         {
             var margin = product.Revenue - product.RawMaterialCost;
-            return new ProductFinancialResult(product.Id, product.FamilyId, Wire(margin),
-                product.SalesVolume is > 0 ? Wire(margin / product.SalesVolume) : null,
-                Wire(RankingRules.Percentage(margin, product.Revenue)),
-                Wire(RankingRules.Percentage(product.Revenue, input.Version.Data.TotalRevenue)),
-                Wire(routeDurations[product.Id]), product.RouteDurations.Count);
+            var productId = product.Id;
+            var path = $"/products/{productId:D}";
+            return new ProductFinancialResult(productId, product.FamilyId, Wire(margin, path + "/marginIncome", productId),
+                Wire(ExactRatio.Divide(margin, product.SalesVolume), path + "/marginIncomePerUnit", productId),
+                Wire(RankingRules.Percentage(margin, product.Revenue), path + "/marginPercent", productId),
+                Wire(RankingRules.Percentage(product.Revenue, input.Version.Data.TotalRevenue), path + "/revenueSharePercent", productId),
+                Wire(routeDurations[productId], path + "/routeDurationHours", productId), product.RouteDurations.Count);
         }).ToArray();
 
         var cycles = input.Families.Select(family =>
@@ -35,8 +37,10 @@ internal static class FamilyMatrixCalculator
                         "Уточните время каждого вхождения маршрутов.", family.Id, "warning")]);
             }
 
-            var exceeds = difference > RankingRules.CycleRecommendation;
-            return new FamilyCycleResult(family.Id, Wire(difference), exceeds ? "exceedsRecommendation" : "withinRecommendation",
+            var exceeds = FamilyCycle.ExceedsRecommendation(difference);
+            return new FamilyCycleResult(family.Id,
+                Wire(difference, $"/cycles/{family.Id:D}/cycleDifferencePercent", family.Id),
+                exceeds ? "exceedsRecommendation" : "withinRecommendation",
                 exceeds ? [Issue("CYCLE_DIFFERENCE_ABOVE_RECOMMENDATION", "/cycles", "Разница времени циклов выше 20%.",
                     "Укажите обоснование состава семейства.", family.Id, "warning")] : []);
         }).ToArray();

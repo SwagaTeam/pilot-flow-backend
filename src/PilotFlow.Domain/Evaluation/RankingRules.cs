@@ -4,7 +4,6 @@ public static class RankingRules
 {
     public const decimal RevenueMinimum = 10m;
     public const decimal DurationMaximum = 30m;
-    public const decimal CycleRecommendation = 20m;
 
     public static decimal? SalesGrowth(decimal? percent) => percent switch
     {
@@ -12,14 +11,6 @@ public static class RankingRules
         > 30m => 1.5m,
         >= 10m => 1m,
         _ => 0.5m,
-    };
-
-    public static decimal? Load(decimal? percent) => percent switch
-    {
-        null => null,
-        > 80m => 1m,
-        >= 50m => 2m,
-        _ => 3m,
     };
 
     public static decimal? Production(string? type) => type switch
@@ -38,30 +29,14 @@ public static class RankingRules
         _ => other,
     };
 
-    public static Dictionary<decimal, int> DenseRanks(IEnumerable<decimal?> values, bool ascending = false)
+    public static Dictionary<T, int> DenseRanks<T>(IEnumerable<T?> values, bool ascending = false)
+        where T : struct, IComparable<T>
     {
-        var distinct = values.OfType<decimal>().Distinct();
+        var distinct = values.OfType<T>().Distinct();
         var ordered = ascending ? distinct.Order() : distinct.OrderDescending();
         return ordered.Select((value, index) => (value, rank: index + 1))
             .ToDictionary(item => item.value, item => item.rank);
     }
 
-    public static decimal? Percentage(decimal? amount, decimal? total)
-    {
-        if (amount is not { } numerator || total is not > 0)
-        {
-            return null;
-        }
-
-        // Multiply first to preserve precision at the admission and scoring thresholds.
-        // Clamp only ratios beyond decimal's range, which are unrepresentable on the wire too.
-        try
-        {
-            return numerator * 100m / total;
-        }
-        catch (OverflowException)
-        {
-            return numerator < 0 ? decimal.MinValue : decimal.MaxValue;
-        }
-    }
+    public static ExactRatio? Percentage(decimal? amount, decimal? total) => ExactRatio.Divide(amount, total, 100);
 }

@@ -43,7 +43,7 @@ public sealed class ProjectReferenceTests
                 .Descendants("ProjectReference")
                 .Select(element => element.Attribute("Include")?.Value)
                 .Where(static include => include is not null)
-                .Select(include => Path.GetRelativePath(repositoryRoot, Path.GetFullPath(include!, projectDirectory)))
+                .Select(include => Path.GetRelativePath(repositoryRoot, Path.GetFullPath(NormalizePath(include!), projectDirectory)))
                 .Select(NormalizePath)
                 .Order(StringComparer.Ordinal)
                 .ToArray();

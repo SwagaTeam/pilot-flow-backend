@@ -7,7 +7,11 @@ internal static class DecisionInputValidation
 {
     internal static AnalysisEvidence EmptyEvidence { get; } = new()
     {
-        Source = null, Period = null, Basis = null, AssessedOn = null, MissingReason = null,
+        Source = null,
+        Period = null,
+        Basis = null,
+        AssessedOn = null,
+        MissingReason = null,
     };
 
     internal static void Text(List<AnalysisIssue> issues, string? value, int maxLength, string path)

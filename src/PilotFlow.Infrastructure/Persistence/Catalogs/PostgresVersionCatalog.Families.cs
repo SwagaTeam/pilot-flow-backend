@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using PilotFlow.Application.Analyses;
 using PilotFlow.Application.Catalogs;
+using PilotFlow.Application.Evaluation;
 using PilotFlow.Application.Families;
 using PilotFlow.Domain.Analyses;
 using PilotFlow.Domain.Catalogs;
@@ -132,7 +133,7 @@ internal sealed partial class PostgresVersionCatalog
                 await db.SaveChangesAsync(token);
             }
             catch (DbUpdateException error) when (error.InnerException is PostgresException
-                { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "family_route_step_pkey" })
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "family_route_step_pkey" })
             {
                 return new(AnalysisWriteStatus.StateConflict);
             }
@@ -170,16 +171,23 @@ internal sealed partial class PostgresVersionCatalog
                 {
                     var members = group.ToArray();
                     var cycle = FamilyCycle.Difference(members);
-                    var roundedCycle = cycle is null ? null : (decimal?)decimal.Round(cycle.Value, 6);
-                    var wireCycle = roundedCycle < 1_000_000_000_000_000_000m ? roundedCycle : null;
-                    IReadOnlyList<FamilyNotice> issues = (cycle, wireCycle) switch
+                    decimal? wireCycle = null;
+                    if (cycle is { } known)
                     {
-                        (null, _) => [new("CYCLE_DIFFERENCE_UNKNOWN", "warning", "/route/steps",
+                        if (!known.TryRoundForWire(out var rounded))
+                        {
+                            throw new EvaluationNumericRangeException("/cycleDifferencePercent", members[0].ProductId);
+                        }
+
+                        wireCycle = rounded;
+                    }
+
+                    IReadOnlyList<FamilyNotice> issues = cycle switch
+                    {
+                        null => [new("CYCLE_DIFFERENCE_UNKNOWN", "warning", "/route/steps",
                             "Различие циклов неизвестно: время должно быть указано для каждого вхождения, а минимальный цикл больше нуля.",
                             "Уточните продолжительность вхождений.", null)],
-                        (> FamilyCycle.RecommendationPercent, null) => [new("CYCLE_DIFFERENCE_ABOVE_RECOMMENDATION", "warning", "/compositionReason",
-                            "Различие циклов превышает диапазон контракта.", "Обоснуйте объединение продукции в одно семейство.", null)],
-                        (> FamilyCycle.RecommendationPercent, _) => [new("CYCLE_DIFFERENCE_ABOVE_RECOMMENDATION", "warning", "/compositionReason",
+                        { } difference when FamilyCycle.ExceedsRecommendation(difference) => [new("CYCLE_DIFFERENCE_ABOVE_RECOMMENDATION", "warning", "/compositionReason",
                             "Различие циклов превышает 20%.", "Обоснуйте объединение продукции в одно семейство.", null)],
                         _ => [],
                     };

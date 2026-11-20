@@ -40,7 +40,7 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
                     or "forkVersion" or "createFamily" or "replaceFamily" or "assignProducts"
                     or "replaceProtocol" or "replaceSelection" => HttpStatusCode.BadRequest,
                 "deleteProduct" or "deleteOperation" or "deleteFamily" or "finalizeDecision" => HttpStatusCode.ServiceUnavailable,
-                _ => HttpStatusCode.NotImplemented,
+                _ => throw new InvalidOperationException($"Missing test expectation for {operation.OperationId}."),
             };
             Assert.True(
                 valid.StatusCode == expected,

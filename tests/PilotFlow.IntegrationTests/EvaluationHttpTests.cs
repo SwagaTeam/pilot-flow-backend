@@ -221,6 +221,91 @@ public sealed class EvaluationHttpTests(AnalysisApiDatabase database) : IClassFi
         Assert.Equal(JsonValueKind.Null, first.GetProperty("totalScore").ValueKind);
     }
 
+    [Fact]
+    public async Task Evaluation_UsesExactMarginAndLaborRanksWhenWireValuesTie()
+    {
+        var seeded = await SeedAsync();
+        await using var update = database.DataSource.CreateCommand("""
+            UPDATE pilot.analysis_version SET total_revenue = 180000000000000003, revision = revision + 1 WHERE id = @version;
+            UPDATE pilot.product SET
+                revenue = CASE name WHEN 'Product 1' THEN 90000000000000001
+                    WHEN 'Product 2' THEN 90000000000000002 ELSE 0 END,
+                raw_material_cost = CASE name WHEN 'Product 1' THEN 90000000000000000
+                    WHEN 'Product 2' THEN 90000000000000001 ELSE 0 END
+            WHERE version_id = @version;
+            UPDATE pilot.family_metrics SET labor_mode = 'calculated',
+                direct_labor_hours = CASE WHEN family_id = @first THEN 90000000000000002 ELSE 90000000000000003 END,
+                output_quantity = CASE WHEN family_id = @first THEN 90000000000000001 ELSE 90000000000000002 END,
+                labor_hours_per_unit = NULL, labor_base_quantity = NULL
+            WHERE family_id IN (@first, @second);
+            """);
+        update.Parameters.AddWithValue("version", seeded.Version);
+        update.Parameters.AddWithValue("first", seeded.Families[0]);
+        update.Parameters.AddWithValue("second", seeded.Families[1]);
+        await update.ExecuteNonQueryAsync();
+        using var factory = CreateFactory();
+        using var client = Client(factory, seeded.Owner);
+        using var response = await client.GetAsync(seeded.Path + "/evaluation");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+        var scores = body.RootElement.GetProperty("families").EnumerateArray().ToDictionary(
+            family => family.GetProperty("familyId").GetGuid(),
+            family => family.GetProperty("scores").EnumerateArray().ToDictionary(score =>
+                score.GetProperty("criterion").GetString()!, score =>
+                (score.GetProperty("value").GetString(), score.GetProperty("score").GetString())));
+        Assert.Equal(("0", "3"), scores[seeded.Families[0]]["margin"]);
+        Assert.Equal(("0", "1.5"), scores[seeded.Families[1]]["margin"]);
+        Assert.Equal(("1", "2"), scores[seeded.Families[0]]["labor"]);
+        Assert.Equal(("1", "3"), scores[seeded.Families[1]]["labor"]);
+    }
+
+    [Fact]
+    public async Task FamilyMatrix_ReturnsNumericRangeForUnrepresentableIncomePerUnit()
+    {
+        var seeded = await SeedAsync();
+        await using var update = database.DataSource.CreateCommand("""
+            UPDATE pilot.product SET sales_volume = 0.000001, raw_material_cost = 999999999999999999
+            WHERE version_id = $1 AND name = 'Product 1'
+            """);
+        update.Parameters.Add(new Npgsql.NpgsqlParameter<Guid> { TypedValue = seeded.Version });
+        await update.ExecuteNonQueryAsync();
+        using var factory = CreateFactory();
+        using var client = Client(factory, seeded.Owner);
+        using var response = await client.GetAsync(seeded.Path + "/family-matrix");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+        var issue = Assert.Single(body.RootElement.GetProperty("issues").EnumerateArray());
+        Assert.Equal("NUMERIC_RANGE", issue.GetProperty("code").GetString());
+        Assert.EndsWith("/marginIncomePerUnit", issue.GetProperty("path").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FamilySuggestions_ReturnsNumericRangeForUnrepresentableCycleDifference()
+    {
+        var seeded = await SeedAsync();
+        await using var update = database.DataSource.CreateCommand("""
+            INSERT INTO pilot.operation (id, version_id, name, kind, aggregation_evidence)
+              VALUES (@operation, @version, 'Test operation', 'operation', '{}');
+            INSERT INTO pilot.product_route_step (
+              occurrence_id, version_id, product_id, operation_id, position, duration_hours, evidence)
+              SELECT gen_random_uuid(), @version, id, @operation, 1,
+                CASE WHEN name = 'Product 1' THEN 0.000001 ELSE 999999999999999999 END, '{}'
+              FROM pilot.product
+              WHERE version_id = @version AND name IN ('Product 1', 'Product 2');
+            """);
+        update.Parameters.AddWithValue("version", seeded.Version);
+        update.Parameters.AddWithValue("operation", Guid.NewGuid());
+        await update.ExecuteNonQueryAsync();
+        using var factory = CreateFactory();
+        using var client = Client(factory, seeded.Owner);
+        using var response = await client.GetAsync(seeded.Path + "/family-suggestions");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+        var issue = Assert.Single(body.RootElement.GetProperty("issues").EnumerateArray());
+        Assert.Equal("NUMERIC_RANGE", issue.GetProperty("code").GetString());
+        Assert.Equal("/cycleDifferencePercent", issue.GetProperty("path").GetString());
+    }
+
     private async Task<(Guid Version, string Path, string Owner, Guid[] Families)> SeedAsync()
     {
         var analysis = Guid.NewGuid();

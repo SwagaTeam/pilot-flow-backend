@@ -59,6 +59,12 @@ public static class ProblemResults
         Create(context, "urn:pilot:problem:validation", "Проверьте данные", StatusCodes.Status422UnprocessableEntity,
             "Запрос нарушает правила ввода.", "VALIDATION_FAILED", issues);
 
+    public static ApiProblemResult NumericRange(HttpContext context, string path, Guid? entityId) =>
+        Create(context, "urn:pilot:problem:validation", "Проверьте данные", StatusCodes.Status422UnprocessableEntity,
+            "Расчётное значение выходит за пределы формата.", "NUMERIC_RANGE",
+            [new ApiIssue("NUMERIC_RANGE", "error", path, "Значение нельзя представить с точностью до шести дробных знаков.",
+                "Проверьте исходные суммы, количества и единицы измерения.", entityId)]);
+
     public static ApiProblemResult DatabaseUnavailable(HttpContext context) =>
         Create(context, "urn:pilot:problem:unavailable", "Хранилище недоступно", StatusCodes.Status503ServiceUnavailable,
             "Хранилище анализа временно недоступно.", "DATABASE_UNAVAILABLE");
@@ -66,15 +72,6 @@ public static class ProblemResults
     public static ApiProblemResult InternalError(HttpContext context) =>
         Create(context, "urn:pilot:problem:internal-error", "Внутренняя ошибка", StatusCodes.Status500InternalServerError,
             "Не удалось обработать запрос.", "INTERNAL_ERROR");
-
-    public static IResult NotImplemented(HttpContext context, string operationId) =>
-        Create(
-            context,
-            "urn:pilot:problem:not-implemented",
-            "Операция ещё не реализована",
-            StatusCodes.Status501NotImplemented,
-            $"Операция {operationId} зарегистрирована контрактом, но её обработчик ещё не реализован.",
-            "NOT_IMPLEMENTED");
 
     private static ApiProblemResult Create(
         HttpContext context,

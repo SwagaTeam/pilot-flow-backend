@@ -24,12 +24,22 @@ public sealed record MetricsData
 
     public static MetricsData Empty { get; } = new()
     {
-        SalesGrowthPercent = null, SalesGrowthEvidence = DecisionInputValidation.EmptyEvidence,
-        LoadPercent = null, LoadActual = null, LoadCapacity = null, LoadUnit = null,
+        SalesGrowthPercent = null,
+        SalesGrowthEvidence = DecisionInputValidation.EmptyEvidence,
+        LoadPercent = null,
+        LoadActual = null,
+        LoadCapacity = null,
+        LoadUnit = null,
         LoadEvidence = DecisionInputValidation.EmptyEvidence,
-        ProductionType = null, ProductionTypeEvidence = DecisionInputValidation.EmptyEvidence,
-        LaborMode = "manual", LaborHoursPerUnit = null, DirectLaborHours = null, OutputQuantity = null,
-        LaborUnitCode = null, LaborBaseQuantity = null, LaborEvidence = DecisionInputValidation.EmptyEvidence,
+        ProductionType = null,
+        ProductionTypeEvidence = DecisionInputValidation.EmptyEvidence,
+        LaborMode = "manual",
+        LaborHoursPerUnit = null,
+        DirectLaborHours = null,
+        OutputQuantity = null,
+        LaborUnitCode = null,
+        LaborBaseQuantity = null,
+        LaborEvidence = DecisionInputValidation.EmptyEvidence,
         ComparabilityExplanation = null,
     };
 }

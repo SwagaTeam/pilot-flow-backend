@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using PilotFlow.Api.Endpoints;
 
 namespace PilotFlow.Api.Hosting;
 
@@ -18,7 +17,6 @@ public static class EndpointRouteBuilderExtensions
                 context.RequestAborted),
         });
         endpoints.MapGet("/swagger", static () => Results.LocalRedirect("~/swagger/swagger.html"));
-        endpoints.MapScaffoldEndpoints();
         endpoints.MapControllers();
 
         return endpoints;

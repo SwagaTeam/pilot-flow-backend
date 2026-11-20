@@ -24,9 +24,16 @@ public sealed record ProtocolData
 
     public static ProtocolData Empty { get; } = new()
     {
-        ProtocolNumber = null, AgreementNumber = null, AgreementDate = null, EnterpriseParty = null, PartnerParty = null,
-        SigningPlace = null, ProtocolDate = null, Conclusions = null,
-        PreparedBy = new() { FullName = null, Position = null }, ApprovedBy = new() { FullName = null, Position = null },
+        ProtocolNumber = null,
+        AgreementNumber = null,
+        AgreementDate = null,
+        EnterpriseParty = null,
+        PartnerParty = null,
+        SigningPlace = null,
+        ProtocolDate = null,
+        Conclusions = null,
+        PreparedBy = new() { FullName = null, Position = null },
+        ApprovedBy = new() { FullName = null, Position = null },
     };
 
     public IReadOnlyList<AnalysisIssue> ValidateInput()

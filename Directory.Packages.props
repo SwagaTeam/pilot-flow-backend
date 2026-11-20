@@ -9,6 +9,8 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Npgsql" Version="10.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.4" />
+    <PackageVersion Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.17.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />

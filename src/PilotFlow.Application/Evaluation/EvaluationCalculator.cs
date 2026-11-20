@@ -7,6 +7,12 @@ namespace PilotFlow.Application.Evaluation;
 
 public static class EvaluationCalculator
 {
+    private static readonly ExactRatio Zero = ExactRatio.From(0m);
+    private static readonly ExactRatio RevenueMinimum = ExactRatio.From(RankingRules.RevenueMinimum);
+    private static readonly ExactRatio LoadMedium = ExactRatio.From(50m);
+    private static readonly ExactRatio LoadHigh = ExactRatio.From(80m);
+    private static readonly ExactRatio LoadFull = ExactRatio.From(100m);
+
     public static EvaluationAggregate Calculate(EvaluationInputs input, DateTimeOffset now)
     {
         var members = input.Products.ToLookup(product => product.FamilyId);
@@ -25,17 +31,23 @@ public static class EvaluationCalculator
         {
             var complete = completeRanking && item.Complete;
             int? rank = complete ? overallRanks[item.Sum] : null;
+            var familyId = item.Totals.Family.Id;
+            var path = $"/families/{familyId:D}";
             return new FamilyEvaluationResult(
-                item.Totals.Family.Id, Wire(item.Totals.Revenue), Wire(item.Totals.Cost),
-                Wire(item.Totals.Revenue - item.Totals.Cost), Wire(item.Totals.Share), Wire(item.Totals.Margin),
-                Wire(item.Totals.MaxDays), item.Totals.Admission, item.Totals.Issues.ToArray(),
-                item.Scores.Select(score => score.Result).ToArray(), Wire(item.Sum)!, item.Count,
-                complete ? Wire(item.Sum) : null, rank,
+                familyId, Wire(item.Totals.Revenue, path + "/revenue", familyId),
+                Wire(item.Totals.Cost, path + "/rawMaterialCost", familyId),
+                Wire(item.Totals.Revenue - item.Totals.Cost, path + "/marginIncome", familyId),
+                Wire(item.Totals.Share, path + "/revenueSharePercent", familyId),
+                Wire(item.Totals.Margin, path + "/marginPercent", familyId),
+                Wire(item.Totals.MaxDays, path + "/maxCalendarDurationDays", familyId),
+                item.Totals.Admission, item.Totals.Issues,
+                item.Scores.Select(score => score.Result).ToArray(), Format(item.Sum), item.Count,
+                complete ? Format(item.Sum) : null, rank,
                 !complete && item.Totals.Admission != "excluded",
                 canRecommend && item.Totals.Family.Confirmed && (rank == 1 || rank == 2 && item.Sum >= 7m));
         }).ToArray();
         var evaluation = new EvaluationResult(input.Version.Id, input.Version.Revision, input.Version.RulesVersion,
-            now, Wire(revenue), Wire(remainder), issues, evaluations,
+            now, Wire(revenue, "/reconciledRevenue"), Wire(remainder, "/remainderRevenue"), issues, evaluations,
             evaluations.Where(family => family.Rank == 1).Select(family => family.FamilyId).ToArray(),
             canRecommend, canRecommend);
         var matrix = FamilyMatrixCalculator.Calculate(input, members);
@@ -44,7 +56,7 @@ public static class EvaluationCalculator
         return new(input.Version, evaluation, matrix, options, validation, input.Protocol, input.Selection);
     }
 
-    internal static string? Wire(decimal? number)
+    internal static string? Wire(decimal? number, string path, Guid? entityId = null)
     {
         if (number is not { } value)
         {
@@ -53,8 +65,14 @@ public static class EvaluationCalculator
 
         var rounded = decimal.Round(value, 6, MidpointRounding.AwayFromZero);
         return rounded is <= -1_000_000_000_000_000_000m or >= 1_000_000_000_000_000_000m
-            ? null : rounded.ToString("0.######", CultureInfo.InvariantCulture);
+            ? throw new EvaluationNumericRangeException(path, entityId) : Format(rounded);
     }
+
+    internal static string? Wire(ExactRatio? number, string path, Guid? entityId = null) =>
+        number is not { } ratio ? null : ratio.TryRoundForWire(out var rounded)
+            ? Format(rounded) : throw new EvaluationNumericRangeException(path, entityId);
+
+    private static string Format(decimal number) => number.ToString("0.######", CultureInfo.InvariantCulture);
 
     internal static decimal? SumKnown(IEnumerable<decimal?> numbers)
     {
@@ -97,12 +115,6 @@ public static class EvaluationCalculator
             issues.Add(Issue("PRODUCT_REVENUE_MISSING", "/products", "Выручка части продукции неизвестна.",
                 "Укажите выручку каждой позиции, включая «Прочее»."));
         }
-        else if (Wire(revenue) is null || remainder.HasValue && Wire(remainder) is null)
-        {
-            issues.Add(Issue("RECONCILIATION_RANGE", "/products", "Итог сверки выходит за диапазон контракта.",
-                "Проверьте единицы и суммы исходных данных."));
-        }
-
         if (remainder < 0)
         {
             issues.Add(Issue("REVENUE_EXCEEDS_TOTAL", "/data/totalRevenue", "Сумма выручки продукции выше общей выручки.",
@@ -125,7 +137,7 @@ public static class EvaluationCalculator
         var margin = RankingRules.Percentage(revenue - cost, revenue);
         var days = products.Select(product => product.CalendarDurationDays).Max();
         var issues = new List<EvaluationIssue>();
-        var excluded = share < RankingRules.RevenueMinimum;
+        var excluded = share < RevenueMinimum;
         var unknown = share is null;
         var familyPath = $"/families/{family.Id:D}";
         if (products.Length == 0)
@@ -181,13 +193,13 @@ public static class EvaluationCalculator
         var metric = totals.Family.Metrics;
         var labor = Labor(metric);
         var load = metric.LoadActual.HasValue && metric.LoadCapacity is > 0
-            ? RankingRules.Percentage(metric.LoadActual, metric.LoadCapacity) : metric.LoadPercent;
+            ? RankingRules.Percentage(metric.LoadActual, metric.LoadCapacity) : ExactRatio.From(metric.LoadPercent);
         var isApplicable = totals.Admission != "excluded";
         var eligibleForRank = totals.Admission == "admitted";
         var mayCompare = eligibleForRank && !ranks.UnknownAdmission;
         var shareRank = Rank(ranks.Share, totals.Share);
         var laborRank = Rank(ranks.Labor, labor);
-        var hasMarginMaximum = ranks.BestMargin is >= 0;
+        var hasMarginMaximum = ranks.BestMargin >= Zero;
         ScoreValue[] scores =
         [
             Criterion("revenueShare", totals.Share, "%", data.RevenueEvidence,
@@ -197,17 +209,17 @@ public static class EvaluationCalculator
                 provisional: !mayCompare || !ranks.SharesComplete),
             Criterion("margin", totals.Margin, "%", data.RevenueEvidence,
                 eligibleForRank && hasMarginMaximum && totals.Margin is { } margin
-                    ? margin == ranks.BestMargin ? 3m : margin >= 0 ? 1.5m : 1m : null,
+                    ? margin == ranks.BestMargin ? 3m : margin >= Zero ? 1.5m : 1m : null,
                 totals.Margin switch
                 {
-                    { } value when value == ranks.BestMargin && value >= 0 => "Наибольшая маржинальность среди допущенных потоков.",
-                    >= 0 => "Неотрицательная маржинальность ниже максимума.",
-                    < 0 => "Отрицательная маржинальность.",
+                    { } value when value == ranks.BestMargin && value >= Zero => "Наибольшая маржинальность среди допущенных потоков.",
+                    { } value when value >= Zero => "Неотрицательная маржинальность ниже максимума.",
+                    { } value when value < Zero => "Отрицательная маржинальность.",
                     _ => "Маржинальность рассчитывается по суммам выручки и сырьевой себестоимости.",
                 },
                 provisional: !mayCompare || !ranks.MarginsComplete,
-                unresolved: mayCompare && ranks.MarginsComplete && ranks.BestMargin is < 0),
-            Criterion("salesGrowth", metric.SalesGrowthPercent, "%", metric.SalesGrowthEvidence,
+                unresolved: mayCompare && ranks.MarginsComplete && ranks.BestMargin < Zero),
+            Criterion("salesGrowth", ExactRatio.From(metric.SalesGrowthPercent), "%", metric.SalesGrowthEvidence,
                 RankingRules.SalesGrowth(metric.SalesGrowthPercent),
                 metric.SalesGrowthPercent switch
                 {
@@ -217,15 +229,16 @@ public static class EvaluationCalculator
                     < 0 => "Прогноз снижения продаж.",
                     _ => "Прогноз роста продаж неизвестен.",
                 }, unresolved: metric.SalesGrowthPercent < 0),
-            Criterion("load", load, "%", metric.LoadEvidence, RankingRules.Load(load),
+            Criterion("load", load, "%", metric.LoadEvidence,
+                load is null ? null : load > LoadHigh ? 1m : load >= LoadMedium ? 2m : 3m,
                 load switch
                 {
-                    > 80 => "Загрузка выше 80%.",
-                    >= 50 => "Загрузка от 50% до 80% включительно.",
-                    >= 0 => "Загрузка ниже 50%.",
+                    { } value when value > LoadHigh => "Загрузка выше 80%.",
+                    { } value when value >= LoadMedium => "Загрузка от 50% до 80% включительно.",
+                    not null => "Загрузка ниже 50%.",
                     _ => "Загрузка неизвестна.",
                 },
-                extra: load > 100 ? Issue("LOAD_ABOVE_CAPACITY", "/metrics/loadPercent", "Загрузка выше 100%.",
+                extra: load > LoadFull ? Issue("LOAD_ABOVE_CAPACITY", "/metrics/loadPercent", "Загрузка выше 100%.",
                     "Проверьте основание расчёта загрузки.", totals.Family.Id, "warning") : null),
             Criterion("productionType", null, "type", metric.ProductionTypeEvidence,
                 RankingRules.Production(metric.ProductionType),
@@ -245,7 +258,7 @@ public static class EvaluationCalculator
         ];
         return new(totals, scores, scores.Sum(score => score.Value ?? 0m), scores.Count(score => score.Value.HasValue));
 
-        ScoreValue Criterion(string criterion, decimal? value, string unit, AnalysisEvidence evidence, decimal? score,
+        ScoreValue Criterion(string criterion, ExactRatio? value, string unit, AnalysisEvidence evidence, decimal? score,
             string explanation, bool provisional = false, bool unresolved = false, bool incompatible = false,
             EvaluationIssue? extra = null)
         {
@@ -279,23 +292,25 @@ public static class EvaluationCalculator
             }
 
             var applicableScore = isApplicable ? score : null;
-            return new(applicableScore, new(criterion, Wire(value), unit, Wire(applicableScore), status, evidence,
+            var pathToValue = FormattableString.Invariant($"/families/{totals.Family.Id:D}/scores/{criterion}/value");
+            return new(applicableScore, new(criterion, Wire(value, pathToValue, totals.Family.Id),
+                unit, applicableScore is { } points ? Format(points) : null, status, evidence,
                 issues, $"FCK_{criterion.ToUpperInvariant()}", explanation));
         }
     }
 
-    private static decimal? Labor(MetricsData metrics) => metrics.LaborMode switch
+    private static ExactRatio? Labor(MetricsData metrics) => metrics.LaborMode switch
     {
-        "manual" when metrics.LaborBaseQuantity is > 0 => metrics.LaborHoursPerUnit / metrics.LaborBaseQuantity,
-        "calculated" when metrics.OutputQuantity is > 0 => metrics.DirectLaborHours / metrics.OutputQuantity,
+        "manual" => ExactRatio.Divide(metrics.LaborHoursPerUnit, metrics.LaborBaseQuantity),
+        "calculated" => ExactRatio.Divide(metrics.DirectLaborHours, metrics.OutputQuantity),
         _ => null,
     };
 
-    private static int Rank(Dictionary<decimal, int> ranks, decimal? value) =>
+    private static int Rank(Dictionary<ExactRatio, int> ranks, ExactRatio? value) =>
         value is { } number ? ranks.GetValueOrDefault(number) : 0;
 
     private sealed record FamilyTotals(
-        EvaluationFamily Family, decimal? Revenue, decimal? Cost, decimal? Share, decimal? Margin, decimal? MaxDays,
+        EvaluationFamily Family, decimal? Revenue, decimal? Cost, ExactRatio? Share, ExactRatio? Margin, decimal? MaxDays,
         string Admission, IReadOnlyList<EvaluationIssue> Issues);
 
     private sealed record ScoreValue(decimal? Value, CriterionResult Result);
@@ -308,10 +323,10 @@ public static class EvaluationCalculator
     private sealed class ComparisonRanks(FamilyTotals[] admitted, bool unknownAdmission, AnalysisPeriod? laborPeriod)
     {
         public bool UnknownAdmission { get; } = unknownAdmission;
-        public Dictionary<decimal, int> Share { get; } = RankingRules.DenseRanks(admitted.Select(item => item.Share));
-        public Dictionary<decimal, int> Labor { get; } =
+        public Dictionary<ExactRatio, int> Share { get; } = RankingRules.DenseRanks(admitted.Select(item => item.Share));
+        public Dictionary<ExactRatio, int> Labor { get; } =
             RankingRules.DenseRanks(admitted.Select(item => EvaluationCalculator.Labor(item.Family.Metrics)), ascending: true);
-        public decimal? BestMargin { get; } = admitted.Select(item => item.Margin).Max();
+        public ExactRatio? BestMargin { get; } = admitted.Select(item => item.Margin).Max();
         public bool SharesComplete { get; } = admitted.All(item => item.Share.HasValue);
         public bool MarginsComplete { get; } = admitted.All(item => item.Margin.HasValue);
         public bool LaborComplete { get; } = admitted.All(item => EvaluationCalculator.Labor(item.Family.Metrics).HasValue);

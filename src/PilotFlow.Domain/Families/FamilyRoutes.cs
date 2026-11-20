@@ -1,4 +1,5 @@
 using PilotFlow.Domain.Catalogs;
+using PilotFlow.Domain.Evaluation;
 
 namespace PilotFlow.Domain.Families;
 
@@ -89,7 +90,9 @@ public sealed class RouteSignature : IEquatable<RouteSignature>
 
 public static class FamilyCycle
 {
-    public const decimal RecommendationPercent = 20;
+    private static readonly ExactRatio Recommendation = ExactRatio.From(20m);
+
+    public static bool ExceedsRecommendation(ExactRatio? difference) => difference > Recommendation;
 
     public static decimal? RouteDuration(IEnumerable<RouteStepData> steps)
     {
@@ -107,10 +110,10 @@ public static class FamilyCycle
         return total;
     }
 
-    public static decimal? Difference(IEnumerable<ProductFamilyRoute> products) =>
+    public static ExactRatio? Difference(IEnumerable<ProductFamilyRoute> products) =>
         Difference(products.Select(static product => product.Duration));
 
-    public static decimal? Difference(IEnumerable<decimal?> durations)
+    public static ExactRatio? Difference(IEnumerable<decimal?> durations)
     {
         decimal? min = null;
         decimal? max = null;
@@ -125,20 +128,6 @@ public static class FamilyCycle
             max = max is { } longest ? Math.Max(longest, hours) : hours;
         }
 
-        if (min is null or 0 || max is null)
-        {
-            return null;
-        }
-
-        var spread = max.Value - min.Value;
-        // Extremely large percentages exceed the wire range but must still trigger the recommendation.
-        var maxRatio = decimal.MaxValue / 100m;
-        if (min.Value < 1 && spread >= maxRatio * min.Value)
-        {
-            return decimal.MaxValue;
-        }
-
-        var ratio = spread / min.Value;
-        return ratio >= maxRatio ? decimal.MaxValue : ratio * 100m;
+        return RankingRules.Percentage(max - min, min);
     }
 }

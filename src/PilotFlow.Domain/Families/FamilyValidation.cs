@@ -81,7 +81,7 @@ public static class FamilyValidation
                 "Укажите покрытие, источник, дату или период и основание в справочнике операций."));
         }
 
-        if (FamilyCycle.Difference(members) > FamilyCycle.RecommendationPercent && string.IsNullOrWhiteSpace(data.CompositionReason))
+        if (FamilyCycle.ExceedsRecommendation(FamilyCycle.Difference(members)) && string.IsNullOrWhiteSpace(data.CompositionReason))
         {
             issues.Add(new("CYCLE_EXPLANATION_REQUIRED", "/compositionReason", "Различие циклов превышает 20%.",
                 "Укажите основание объединения продукции в одно семейство."));

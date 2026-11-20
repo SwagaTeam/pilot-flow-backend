@@ -7,6 +7,7 @@ using PilotFlow.Application.Decisions;
 using PilotFlow.Application.Evaluation;
 using PilotFlow.Application.Families;
 using PilotFlow.Application.Rules;
+using PilotFlow.Infrastructure.Documents;
 using PilotFlow.Infrastructure.Persistence.Analyses;
 using PilotFlow.Infrastructure.Persistence.Catalogs;
 using PilotFlow.Infrastructure.Persistence.Decisions;
@@ -51,6 +52,8 @@ public static class PersistenceRegistration
             .AddScoped<DecisionSettingsReader>()
             .AddScoped<IDecisionSettingsStore, PostgresDecisionSettingsStore>()
             .AddScoped<IDecisionWorkflow, PostgresDecisionWorkflow>()
+            .AddScoped<DecisionExport>()
+            .AddSingleton<IDecisionPdfRenderer, PdfDecisionRenderer>()
             .AddScoped<EvaluationAggregateReader>()
             .AddScoped<IEvaluationStore, PostgresEvaluationStore>()
             .AddScoped<IFamilyCatalog, PostgresVersionCatalog>()
