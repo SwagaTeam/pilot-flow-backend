@@ -11,7 +11,7 @@ using PilotFlow.Api.Tests.Infrastructure;
 
 namespace PilotFlow.IntegrationTests;
 
-public sealed class CatalogHttpTests(AnalysisApiDatabase database) : IClassFixture<AnalysisApiDatabase>
+public sealed partial class CatalogHttpTests(AnalysisApiDatabase database) : IClassFixture<AnalysisApiDatabase>
 {
     private const string Evidence = """{"source":"Test","basis":null,"period":null,"assessedOn":"2026-11-01","missingReason":null}""";
     private const string Unknown = """{"source":null,"basis":null,"period":null,"assessedOn":null,"missingReason":null}""";
@@ -22,6 +22,51 @@ public sealed class CatalogHttpTests(AnalysisApiDatabase database) : IClassFixtu
         "remainderExplanation":null,"nomenclatureComplete":false,"completenessEvidence":null,
         "participants":[],"enterpriseInn":null,"familyConclusions":null,"rankingConclusions":null,"laborPeriod":null}}
         """;
+
+    [Fact]
+    public async Task FamilyMetrics_ComputeLoadAndRejectInconsistentInputWithoutAdvancingRevision()
+    {
+        using var factory = CreateFactory();
+        using var client = Client(factory);
+        var version = await CreateVersionAsync(client);
+        var familyId = Guid.NewGuid();
+        await using (var seed = database.DataSource.CreateCommand("""
+            INSERT INTO pilot.family (id, version_id, name, confirmed, confirmation_evidence)
+            VALUES ($1, $2, 'Тест', false, '{}')
+            """))
+        {
+            seed.Parameters.Add(new Npgsql.NpgsqlParameter<Guid> { TypedValue = familyId });
+            seed.Parameters.Add(new Npgsql.NpgsqlParameter<Guid> { TypedValue = version.Id });
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var path = version.Path + $"/families/{familyId:D}/metrics";
+        var empty = await GetAsync(client, path);
+        Assert.Equal(JsonValueKind.Null, empty.Body.GetProperty("loadPercent").ValueKind);
+        var metrics = JsonNode.Parse("""
+            {"salesGrowthPercent":"-1.5","salesGrowthEvidence":{},"loadPercent":null,
+            "loadActual":"1","loadCapacity":"3","loadUnit":"шт.","loadEvidence":{},
+            "productionType":"project","productionTypeEvidence":{},"laborMode":"manual",
+            "laborHoursPerUnit":"5","directLaborHours":null,"outputQuantity":null,
+            "laborUnitCode":"piece","laborBaseQuantity":"1","laborEvidence":{},"comparabilityExplanation":null}
+            """)!;
+        foreach (var property in new[] { "salesGrowthEvidence", "loadEvidence", "productionTypeEvidence", "laborEvidence" })
+        {
+            metrics[property] = JsonNode.Parse(Evidence);
+        }
+
+        var saved = await SendAsync(client, HttpMethod.Put, path, metrics, empty.Etag, HttpStatusCode.OK);
+        Assert.Equal("33.333333", saved.Body.GetProperty("loadPercent").GetString());
+        Assert.Equal(-1.5m, decimal.Parse(saved.Body.GetProperty("salesGrowthPercent").GetString()!,
+            System.Globalization.CultureInfo.InvariantCulture));
+        metrics["loadPercent"] = "33.333335";
+        await ProblemAsync(client, HttpMethod.Put, path, HttpStatusCode.UnprocessableEntity, saved.Etag, metrics);
+        metrics["loadPercent"] = null;
+        metrics["loadActual"] = "10000.000001";
+        metrics["loadCapacity"] = "10000";
+        await ProblemAsync(client, HttpMethod.Put, path, HttpStatusCode.UnprocessableEntity, saved.Etag, metrics);
+        Assert.Equal(saved.Etag, (await GetAsync(client, path)).Etag);
+    }
 
     [Fact]
     public async Task IdentityAndRules_ReadAuthenticatedSubjectAndPersistedRuleSet()

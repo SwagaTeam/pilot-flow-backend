@@ -47,6 +47,10 @@ public static class ProblemResults
         Create(context, "urn:pilot:problem:state-conflict", "Конфликт связей", StatusCodes.Status409Conflict,
             "Проверьте существующие связи и идентификаторы перед повтором операции.", "STATE_CONFLICT");
 
+    public static ApiProblemResult ForkVersionConflict(HttpContext context) =>
+        Create(context, "urn:pilot:problem:state-conflict", "Нельзя создать новую версию", StatusCodes.Status409Conflict,
+            "Для создания черновика нужна последняя зафиксированная версия и отсутствие другого черновика.", "STATE_CONFLICT");
+
     public static ApiProblemResult RevisionConflict(HttpContext context) =>
         Create(context, "urn:pilot:problem:revision-conflict", "Ревизия изменилась", StatusCodes.Status412PreconditionFailed,
             "Загрузите актуальные данные и повторите изменение с актуальным ETag.", "REVISION_CONFLICT");

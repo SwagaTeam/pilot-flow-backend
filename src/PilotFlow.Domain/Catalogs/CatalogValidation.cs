@@ -86,7 +86,7 @@ public static class CatalogValidation
         return issues.Count <= 1000 ? issues : issues.Take(1000).ToArray();
     }
 
-    private static void Text(List<AnalysisIssue> issues, string? value, string path, int maxLength, bool required = false)
+    internal static void Text(List<AnalysisIssue> issues, string? value, string path, int maxLength, bool required = false)
     {
         if (required && string.IsNullOrWhiteSpace(value))
         {
@@ -108,7 +108,7 @@ public static class CatalogValidation
         }
     }
 
-    private static void Evidence(List<AnalysisIssue> issues, AnalysisEvidence evidence, string path)
+    internal static void Evidence(List<AnalysisIssue> issues, AnalysisEvidence evidence, string path)
     {
         Text(issues, evidence.Source, path + "/source", 2000);
         Text(issues, evidence.Basis, path + "/basis", 2000);

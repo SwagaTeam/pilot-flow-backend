@@ -36,8 +36,10 @@ public sealed partial class OpenApiIfMatchBoundaryTests(PilotFlowWebApplicationF
             var expected = operation.OperationId switch
             {
                 "replaceVersionData" or "createProduct" or "replaceProduct" or "replaceProductRoute"
-                    or "createOperation" or "replaceOperation" => HttpStatusCode.BadRequest,
-                "deleteProduct" or "deleteOperation" => HttpStatusCode.ServiceUnavailable,
+                    or "createOperation" or "replaceOperation" or "replaceFamilyMetrics"
+                    or "forkVersion" or "createFamily" or "replaceFamily" or "assignProducts"
+                    or "replaceProtocol" or "replaceSelection" => HttpStatusCode.BadRequest,
+                "deleteProduct" or "deleteOperation" or "deleteFamily" or "finalizeDecision" => HttpStatusCode.ServiceUnavailable,
                 _ => HttpStatusCode.NotImplemented,
             };
             Assert.True(

@@ -1,6 +1,6 @@
 namespace PilotFlow.Domain.Analyses;
 
-public sealed record AnalysisIssue(string Code, string Path, string Message, string Suggestion);
+public sealed record AnalysisIssue(string Code, string Path, string Message, string Suggestion, Guid? EntityId = null);
 
 public static class AnalysisValidation
 {

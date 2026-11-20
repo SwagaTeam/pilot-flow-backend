@@ -42,7 +42,7 @@ public abstract class VersionCatalogController : ControllerBase
             AnalysisWriteStatus.StateConflict => ProblemResults.LinkedResourceConflict(HttpContext),
             AnalysisWriteStatus.ValidationFailed => ProblemResults.ValidationFailed(HttpContext,
                 result.Issues!.Select(issue =>
-                    new ApiIssue(issue.Code, "error", issue.Path, issue.Message, issue.Suggestion, null)).ToArray()),
+                    new ApiIssue(issue.Code, "error", issue.Path, issue.Message, issue.Suggestion, issue.EntityId)).ToArray()),
             _ => throw new InvalidOperationException("Unknown catalog write status."),
         };
 }

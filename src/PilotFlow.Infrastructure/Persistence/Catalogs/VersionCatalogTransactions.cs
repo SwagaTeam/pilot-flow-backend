@@ -26,8 +26,13 @@ internal sealed class VersionCatalogTransactions(AnalysisDbContext db)
         return value is null ? null : new(revision.Value, value);
     }
 
+    internal Task<AnalysisWriteResult<Versioned<T>>> WriteAsync<T>(
+        CatalogChange change, Func<CancellationToken, Task<AnalysisWriteResult<T>>> write, CancellationToken cancellationToken) =>
+        WriteAsync(change, write, clearSelection: true, cancellationToken);
+
     internal async Task<AnalysisWriteResult<Versioned<T>>> WriteAsync<T>(
-        CatalogChange change, Func<CancellationToken, Task<AnalysisWriteResult<T>>> write, CancellationToken cancellationToken)
+        CatalogChange change, Func<CancellationToken, Task<AnalysisWriteResult<T>>> write,
+        bool clearSelection, CancellationToken cancellationToken)
     {
         db.EnsureConfigured();
         var scope = change.Scope;
@@ -55,9 +60,12 @@ internal sealed class VersionCatalogTransactions(AnalysisDbContext db)
             });
         }
 
-        // This must precede edits that may remove the product referenced by a selection.
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM pilot.selection WHERE version_id = {scope.VersionId}", cancellationToken);
+        if (clearSelection)
+        {
+            // This must precede edits that may remove the product referenced by a selection.
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM pilot.selection WHERE version_id = {scope.VersionId}", cancellationToken);
+        }
         try
         {
             var result = await write(cancellationToken);

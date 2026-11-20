@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using PilotFlow.Application.Analyses;
 using PilotFlow.Application.Catalogs;
+using PilotFlow.Application.Families;
 using PilotFlow.Domain.Analyses;
 using PilotFlow.Domain.Catalogs;
 using PilotFlow.Infrastructure.Persistence.Analyses;
 
 namespace PilotFlow.Infrastructure.Persistence.Catalogs;
 
-internal sealed partial class PostgresVersionCatalog(AnalysisDbContext db, VersionCatalogTransactions transactions) : IVersionCatalog
+internal sealed partial class PostgresVersionCatalog(AnalysisDbContext db, VersionCatalogTransactions transactions) : IVersionCatalog, IFamilyCatalog
 {
     public Task<Versioned<Page<ProductEntry>>?> ListProductsAsync(
         VersionScope scope, PageRequest page, string completeness, CancellationToken cancellationToken) =>

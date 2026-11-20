@@ -6,8 +6,6 @@ public static class DecisionExportCatalog
 
     public static IReadOnlyList<EndpointDescriptor> Endpoints { get; } =
     [
-        new(HttpMethods.Get, $"{Analysis}/decisions", "listDecisions"),
-        new(HttpMethods.Get, $"{Analysis}/decisions/{{decisionId}}", "getDecision"),
         new(HttpMethods.Get, $"{Analysis}/versions/{{versionId}}/export", "exportDraft"),
         new(HttpMethods.Get, $"{Analysis}/decisions/{{decisionId}}/export", "exportDecision"),
     ];

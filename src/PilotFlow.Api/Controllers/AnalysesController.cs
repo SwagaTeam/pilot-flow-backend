@@ -12,7 +12,7 @@ namespace PilotFlow.Api.Controllers;
 [ApiController]
 [Authorize(Policy = AuthenticationExtensions.AnalysisUserPolicy)]
 [Route("/api/v1/analyses")]
-public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands commands) : ControllerBase
+public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands commands, IForkVersionStore forks) : ControllerBase
 {
     private string Owner => User.FindFirst("sub")!.Value;
 
@@ -76,6 +76,26 @@ public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands co
         return result.Value is { } version ? VersionResponse(version) : WriteProblem(result);
     }
 
+    [RequireIfMatch]
+    [HttpPost("{analysisId}/versions/{versionId}/fork", Name = "forkVersion")]
+    public async Task<IResult> ForkAsync(
+        Guid analysisId, Guid versionId, ForkVersionRequest request, CancellationToken cancellationToken)
+    {
+        var etag = (AggregateEtag)HttpContext.Items[AggregateEtag.HttpContextKey]!;
+        var source = new VersionUpdate(analysisId, versionId, etag.VersionId, etag.Revision);
+        var result = await forks.ForkAsync(Owner, source, request.Reason, cancellationToken);
+        if (result.Value is not { } version)
+        {
+            return result.Status == AnalysisWriteStatus.StateConflict
+                ? ProblemResults.ForkVersionConflict(HttpContext)
+                : WriteProblem(result);
+        }
+
+        SetEtag(version);
+        var location = Url.RouteUrl("getVersion", new { analysisId, versionId = version.Id });
+        return Results.Created(location, version);
+    }
+
     private IResult VersionResponse(AnalysisVersionDetails? version)
     {
         if (version is null)
@@ -105,6 +125,12 @@ public sealed class AnalysesController(IAnalysisStore store, AnalysisCommands co
 public sealed class CreateAnalysisRequest
 {
     public required AnalysisData Data { get; init; }
+}
+
+public sealed class ForkVersionRequest
+{
+    [StringLength(2000)]
+    public required string Reason { get; init; }
 }
 
 public class PageQuery

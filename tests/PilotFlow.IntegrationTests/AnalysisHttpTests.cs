@@ -17,7 +17,7 @@ using PilotFlow.Api.Tests.Infrastructure;
 
 namespace PilotFlow.IntegrationTests;
 
-public sealed class AnalysisHttpTests(AnalysisApiDatabase database) : IClassFixture<AnalysisApiDatabase>
+public sealed partial class AnalysisHttpTests(AnalysisApiDatabase database) : IClassFixture<AnalysisApiDatabase>
 {
     private const string Analyses = "/api/v1/analyses";
     private const string Draft = """
@@ -251,9 +251,28 @@ public sealed class AnalysisHttpTests(AnalysisApiDatabase database) : IClassFixt
         await using var command = runtime.CreateCommand("""
             SELECT has_schema_privilege(current_user, 'pilot', 'CREATE')
                 OR has_table_privilege(current_user, 'pilot.analysis_version', 'TRUNCATE')
-                OR has_column_privilege(current_user, 'pilot.analysis_version', 'state', 'UPDATE')
+                OR has_column_privilege(current_user, 'pilot.analysis_version', 'rules_version', 'UPDATE')
+                OR has_table_privilege(current_user, 'pilot.decision', 'UPDATE, DELETE')
             """);
         Assert.Equal(false, await command.ExecuteScalarAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RuntimeRole_CannotFixWithoutDecision()
+    {
+        using var factory = CreateFactory();
+        using var client = CreateClient(factory);
+        var draft = await CreateAsync(client);
+        await using var runtime = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = runtime.CreateCommand("""
+            UPDATE pilot.analysis_version SET state = 'fixed', revision = revision + 1 WHERE id = $1
+            """);
+        command.Parameters.Add(new NpgsqlParameter<Guid> { TypedValue = draft.VersionId });
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync(CancellationToken.None));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+        Assert.Equal("fixed_requires_exactly_one_decision", error.MessageText);
+        using var unchanged = await client.GetAsync(draft.VersionPath, CancellationToken.None);
+        Assert.Equal(draft.Etag, Assert.Single(unchanged.Headers.GetValues("ETag")));
     }
 
     [Fact]

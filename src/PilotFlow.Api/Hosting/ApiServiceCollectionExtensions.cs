@@ -1,9 +1,11 @@
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using PilotFlow.Api.Authentication;
 using PilotFlow.Api.Controllers;
 using PilotFlow.Api.Errors;
 using PilotFlow.Application.Analyses;
 using PilotFlow.Application.Catalogs;
+using PilotFlow.Domain.Decisions;
 using PilotFlow.Infrastructure.Persistence;
 
 namespace PilotFlow.Api.Hosting;
@@ -36,6 +38,20 @@ public static class ApiServiceCollectionExtensions
             {
                 var json = options.JsonSerializerOptions;
                 json.Converters.Add(new DecimalStringConverter());
+                json.TypeInfoResolver = new DefaultJsonTypeInfoResolver
+                {
+                    Modifiers =
+                    {
+                        type =>
+                        {
+                            if (type.Type == typeof(MetricsData))
+                            {
+                                type.Properties.Single(property => property.Name == "salesGrowthPercent").CustomConverter =
+                                    new SignedDecimalStringConverter();
+                            }
+                        },
+                    },
+                };
                 json.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
                 json.PropertyNameCaseInsensitive = false;
                 json.RespectNullableAnnotations = true;
