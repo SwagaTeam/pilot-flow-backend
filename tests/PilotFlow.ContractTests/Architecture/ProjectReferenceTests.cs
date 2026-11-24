@@ -56,7 +56,7 @@ public sealed class ProjectReferenceTests
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
 
-        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, ".git")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PilotFlow.Backend.slnx")))
         {
             directory = directory.Parent;
         }
