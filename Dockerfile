@@ -4,6 +4,10 @@ WORKDIR /src
 COPY . .
 RUN dotnet restore PilotFlow.Backend.slnx
 
+FROM restore AS test
+RUN apk add --no-cache font-dejavu
+ENTRYPOINT ["dotnet", "test", "PilotFlow.Backend.slnx", "--configuration", "Release", "--no-restore"]
+
 FROM restore AS build-api
 RUN dotnet publish src/PilotFlow.Api/PilotFlow.Api.csproj \
     --configuration Release \

@@ -6,3 +6,17 @@
 !.env.example
 *.user
 *.suo
+
+# Production configuration and database dumps
+/deploy/.env
+/backups/
+/artifacts/
+/deploy/.operation.lock
+**/__pycache__/
+/.smoke-*/
+
+deploy/auth-realm.json
+deploy/auth.env
+
+deploy/access.txt
+/releases/

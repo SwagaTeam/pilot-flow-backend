@@ -1,0 +1,110 @@
+name: pilot-flow
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pilot_flow
+      POSTGRES_USER: pilot_admin
+      POSTGRES_PASSWORD: ${PILOTFLOW_DB_PASSWORD:?Run scripts/deploy.sh init}
+    volumes:
+      - postgres-production:/var/lib/postgresql
+    networks: [database]
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, pilot_admin, -d, pilot_flow]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    shm_size: 128mb
+    logging: *logging
+
+  migrate:
+    profiles: [tools]
+    image: pilot-flow-migrator:${PILOTFLOW_RELEASE:-local}
+    build:
+      context: .
+      target: migrator
+    environment:
+      PILOTFLOW_MIGRATION_CONNECTION_STRING: Host=postgres;Database=pilot_flow;Username=pilot_admin;GSS Encryption Mode=Disable
+      PGPASSWORD: ${PILOTFLOW_DB_PASSWORD:?Run scripts/deploy.sh init}
+    networks: [database]
+    logging: *logging
+
+  grant-api:
+    profiles: [tools]
+    image: postgres:18.7-alpine
+    environment:
+      PGPASSWORD: ${PILOTFLOW_DB_PASSWORD:?Run scripts/deploy.sh init}
+      PILOTFLOW_APP_DB_PASSWORD: ${PILOTFLOW_APP_DB_PASSWORD:?Run scripts/deploy.sh init}
+    volumes:
+      - ./docker/postgres/provision-app.sql:/bootstrap/provision-app.sql:ro
+      - ./src/PilotFlow.Infrastructure/Persistence/Security/analysis-grants.sql:/bootstrap/analysis-grants.sql:ro
+    entrypoint: [psql, -X, -h, postgres, -U, pilot_admin, -d, pilot_flow, -v, ON_ERROR_STOP=1, -f, /bootstrap/provision-app.sql, -f, /bootstrap/analysis-grants.sql]
+    networks: [database]
+    logging: *logging
+
+  api:
+    image: pilot-flow-backend:${PILOTFLOW_RELEASE:-local}
+    build:
+      context: .
+      target: final
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PilotFlow: Host=postgres;Database=pilot_flow;Username=pilot_app;GSS Encryption Mode=Disable
+      PGPASSWORD: ${PILOTFLOW_APP_DB_PASSWORD:?Run scripts/deploy.sh init}
+      Jwt__Authority: ${PILOTFLOW_JWT_AUTHORITY:?Set HTTPS OIDC issuer}
+      Jwt__Audience: ${PILOTFLOW_JWT_AUDIENCE:?Set JWT audience}
+      Cors__AllowedOrigins__0: ${PILOTFLOW_FRONTEND_ORIGIN:?Set frontend origin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [database, edge]
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -T 4 -t 1 --spider http://127.0.0.1:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    environment:
+      PILOTFLOW_DOMAIN: ${PILOTFLOW_DOMAIN:?Set API domain}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge]
+    logging: *logging
+
+networks:
+  database:
+    internal: true
+  edge:
+
+volumes:
+  postgres-production:
+  caddy-data:
+  caddy-config:
