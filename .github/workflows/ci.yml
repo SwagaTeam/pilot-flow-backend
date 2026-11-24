@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
   pull_request:
     branches: [main]
 
@@ -35,3 +36,47 @@ jobs:
 
       - name: Run tests
         run: dotnet test PilotFlow.Backend.slnx --configuration Release --no-restore
+
+  deployment:
+    name: Production containers and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check deployment configuration validation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Test production stack, migrations and backup restoration
+        run: python3 scripts/smoke.py
+
+  deploy:
+    name: Deploy production
+    needs: [test, deployment]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: pilot-flow-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - name: Deploy tested commit over pinned SSH connection
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY" && test -n "$KNOWN_HOSTS"
+          umask 077
+          mkdir -p "$RUNNER_TEMP/pilot-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/pilot-ssh/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/pilot-ssh/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/pilot-ssh/key"' EXIT
+          { printf '%s\n' "$GITHUB_SHA"; git archive --format=tar.gz HEAD; } | ssh \
+            -i "$RUNNER_TEMP/pilot-ssh/key" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/pilot-ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            pilot-deploy@194.164.245.165
+      - name: Verify public HTTPS readiness
+        run: curl --fail --retry 6 --retry-delay 10 --retry-all-errors https://wooden-chrysopal29118.my-vm.work/health/ready
