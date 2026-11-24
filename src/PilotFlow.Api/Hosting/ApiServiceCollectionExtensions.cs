@@ -22,6 +22,17 @@ public static class ApiServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(environment);
 
         services.AddPilotFlowAuthentication(configuration, environment);
+        var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        services.AddCors(options => options.AddDefaultPolicy(policy =>
+        {
+            if (origins.Length > 0)
+            {
+                policy.WithOrigins(origins)
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .WithHeaders("Authorization", "Content-Type", "If-Match")
+                    .WithExposedHeaders("ETag", "Location", "Content-Disposition");
+            }
+        }));
         var connectionString = configuration.GetConnectionString("PilotFlow");
         if (environment.IsProduction() && string.IsNullOrWhiteSpace(connectionString))
         {
