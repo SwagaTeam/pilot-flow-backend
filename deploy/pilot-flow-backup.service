@@ -1,0 +1,10 @@
+[Unit]
+Description=Pilot Flow PostgreSQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/pilot-flow
+ExecStart=/bin/bash /opt/pilot-flow/scripts/backup-all.sh
+UMask=0077
