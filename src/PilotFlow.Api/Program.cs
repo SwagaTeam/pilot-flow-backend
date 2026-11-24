@@ -17,6 +17,8 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new PhysicalFileProvider(staticRoot),
     ContentTypeProvider = staticContentTypes,
 });
+app.UseRouting();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapPilotFlowApi();
